@@ -1,5 +1,5 @@
 import * as React from "react"
-import { cn } from "@/lib/utils"
+import cn from "clsx"
 
 /**
  * Skeleton component for loading states
