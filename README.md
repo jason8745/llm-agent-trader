@@ -3,6 +3,9 @@
 ![star](star-history-20251112.png)
 
 AI-powered stock trading backtesting system that integrates Large Language Models for intelligent trading decision analysis.
+![alt text](image.png)
+![alt text](image-1.png)
+![alt text](image-3.png)
 
 ## System Architecture
 
