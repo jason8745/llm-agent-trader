@@ -6,9 +6,9 @@
 
 *English summary at the [end of this page](#english).*
 
-https://github.com/user-attachments/assets/302b4b27-0123-4f33-9b11-6b6c69221360
+https://github.com/user-attachments/assets/6d636093-63ab-43fb-83a0-ccb49cbeabfc
 
-影片為一次真實的 Claude Code 操作：說「開始使用台股回測」、用選項卡片確認條件、用自己的話加上停損，Claude 自動實驗並定稿，dashboard 同步呈現結果。
+影片為一次真實的 Claude Code 操作（2.5.0）：說「開始使用台股回測」、用選項卡片確認四項研究條件、用自己的話加上停損，Claude 自動實驗並定稿，dashboard 同步呈現結果。
 
 ## 特色
 
