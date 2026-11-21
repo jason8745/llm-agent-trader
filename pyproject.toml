@@ -1,55 +1,22 @@
 [project]
-name = "llm-stock-backtesting-dashboard"
-version = "0.1.0"
-description = "LLM-powered stock backtesting dashboard with Streamlit frontend and FastAPI backend"
+name = "llm-agent-trader"
+version = "2.0.0.dev0"
+description = "Taiwan stock backtesting harness for coding agents: MCP tools, a deterministic engine, and a read-only run viewer."
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-    # Core dependencies
-    "numpy>=2.3.2",
-    "pandas>=2.3.1",
-    "python-dateutil>=2.9.0.post0",
-    "pytz>=2025.2",
-    "requests>=2.32.4",
-    # Frontend (Streamlit)
-    "streamlit>=1.47.1",
-    "plotly>=6.2.0",
-    "streamlit-aggrid>=1.1.7",
-    "streamlit-option-menu>=0.4.0",
-    "streamlit-plotly-events>=0.0.6",
-    # Backend (FastAPI)
-    "fastapi>=0.104.1",
-    "uvicorn[standard]>=0.24.0",
-    "sqlalchemy>=2.0.23",
-    "alembic>=1.12.1",
-    "pydantic>=2.5.0",
-    "python-multipart>=0.0.6",
-    "redis>=5.0.1",
-    "httpx>=0.25.2",
-    # Azure OpenAI
-    "openai>=1.3.6",
-    "azure-identity>=1.15.0",
-    # Stock Data
-    "yfinance>=0.2.18",
-    "scipy>=1.11.4",
-    "scikit-learn>=1.3.2",
-    "pydantic-settings>=2.10.1",
-    "langchain>=0.3.27",
-    "langchain-openai>=0.3.28",
-    "langchain-core>=0.3.72",
-    "python-dotenv>=1.1.1",
-    "langchain-google-genai>=2.1.9",
+    "numpy>=2.0",
+    "pandas>=2.2",
 ]
+
+[project.scripts]
+llm-agent-trader = "trader.cli:main"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.4.1",
-    "pytest-cov>=6.2.1",
-    "pytest-asyncio>=0.21.1",
-    "ruff>=0.12.0",
-    "pyright>=1.1.402",
-    "black>=23.11.0",
-    "mypy>=1.7.1",
+    "pytest>=8.0",
+    "ruff>=0.6",
 ]
 
 [build-system]
@@ -57,22 +24,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["backend", "frontend"]
+packages = ["src/trader"]
 
 [tool.ruff]
-line-length = 88
-target-version = "py312"
+line-length = 100
+extend-exclude = ["docs"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "UP"]
-ignore = []
+select = ["E", "F", "I", "B"]
 
-[tool.black]
-line-length = 88
-target-version = ["py312"]
-
-[tool.mypy]
-python_version = "3.12"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -7,26 +7,14 @@ on:
     branches: [master]
 
 jobs:
-  build-and-test:
+  test:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: '3.12'
-
-      - name: Install uv
-        run: pip install uv
-
-      - name: Install dependencies
-        run: uv sync
-
-      - name: Format check
-        run: uv run ruff format --check -v .
-
-      - name: Lint
-        run: uv run ruff check --select I --fix .
+          python-version: "3.12"
+      - run: uv sync
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run pytest -v
