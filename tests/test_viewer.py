@@ -118,3 +118,14 @@ def test_mcp_starts_viewer_for_its_links(ws, monkeypatch):
     status, payload, text = asyncio.run(go())
     assert status == 200
     assert payload["s"]["out_of_sample"] in text
+
+
+def test_rejects_foreign_host_headers(served):
+    port = served.rsplit(":", 1)[1]
+    ok = urllib.request.Request(f"{served}/api/info", headers={"Host": f"localhost:{port}"})
+    assert urllib.request.urlopen(ok, timeout=5).status == 200
+    for host in ["evil.example", f"evil.example:{port}", "127.0.0.1:1"]:
+        req = urllib.request.Request(f"{served}/api/runs", headers={"Host": host})
+        with pytest.raises(urllib.error.HTTPError) as e:
+            urllib.request.urlopen(req, timeout=5)
+        assert e.value.code == 403

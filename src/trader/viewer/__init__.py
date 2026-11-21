@@ -131,6 +131,10 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def do_GET(self):
+        port = self.server.server_address[1]
+        if self.headers.get("Host") not in {f"127.0.0.1:{port}", f"localhost:{port}"}:
+            # Blocks DNS rebinding: a foreign page must not read strategy source or paths.
+            return self._send(403, b"forbidden host", "text/plain")
         path = self.path.split("?", 1)[0]
         if path == "/api/info":
             return self._json({"workspace": str(self.workspace)})
