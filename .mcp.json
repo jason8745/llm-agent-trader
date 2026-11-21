@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "trader": {
-      "command": "uv",
-      "args": ["run", "--no-project", "--python", ">=3.9", "${CLAUDE_PLUGIN_ROOT}/src/trader/mcp_launcher.py"]
-    }
-  }
-}

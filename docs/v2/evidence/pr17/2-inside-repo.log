@@ -1,0 +1,4 @@
+$ claude mcp list   (inside a clone of this branch, maintainer config)
+Checking MCP server health…
+
+plugin:llm-agent-trader:trader: uv run --no-project --python >=3.9 ~/.claude/plugins/cache/llm-agent-trader/llm-agent-trader/2.1.0/src/trader/mcp_launcher.py - ✔ Connected
