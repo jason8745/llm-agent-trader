@@ -107,6 +107,9 @@ def run_backtest(
         result = json.loads(result_file.read_text())
     if "error" in result:
         raise RunError(result["error"])
+    data_sha = data.fingerprint(bars)
+    if result["data_sha"] != data_sha:
+        raise RunError("the strategy process read different bars than were fetched")
 
     payload = {
         "bars": {"date": result["ledger"]["dates"], **{c: bars[c].tolist() for c in BAR_COLUMNS}},
@@ -127,7 +130,7 @@ def run_backtest(
         params=result["params"],
         source=source,
         source_sha=hashlib.sha256(source.encode()).hexdigest(),
-        data_sha=data.fingerprint(bars),
+        data_sha=data_sha,
         payload=payload,
     )
 
@@ -160,7 +163,13 @@ def _child(job: dict) -> dict:
         return {"error": _strategy_error(e, path)}
     ledger = asdict(led)
     ledger["unrealized_pnl"] = led.unrealized_pnl
-    return {"ledger": ledger, "bh_equity": bh.equity, "report": asdict(rep), "params": p}
+    return {
+        "ledger": ledger,
+        "bh_equity": bh.equity,
+        "report": asdict(rep),
+        "params": p,
+        "data_sha": data.fingerprint(bars),
+    }
 
 
 if __name__ == "__main__":

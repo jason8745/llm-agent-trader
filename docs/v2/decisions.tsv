@@ -21,3 +21,6 @@ ts	phase	decision	why	evidence	result
 2026-11-21T04:29:02Z	skill	真實 Claude session 第一次出現口語（方向對了、多賺、掉到等），於 skill 加入正式書面語改寫範例後重跑	術語表不足以約束語氣；以實際觀察到的用語作為範例與自動檢查項目	docs/v2/evidence/pr7/claude-session-before-rewrites.md, claude-session.md	改寫前檢查失敗 7 項，改寫後通過
 2026-11-21T04:29:02Z	privacy	證據檔與 PR 描述移除本機路徑；新增 sanitize_evidence.py	早期證據含本機使用者名稱路徑；已 merge 的 commit 歷史仍含該路徑，改寫需 force push，交由使用者決定	scripts/sanitize_evidence.py, PR #5 #6 #7 描述已更新	需使用者決定是否改寫歷史
 2026-11-21T04:29:02Z	e2e	端到端 session 於使用者本機環境執行，載入了使用者其他 plugin	無法在不影響登入狀態下隔離環境；於 PR 註明	docs/v2/evidence/pr7/claude-session.md	noted
+2026-11-21T04:31:59Z	verify	從 GitHub marketplace 以 local scope 安裝 plugin，於全新專案呼叫 search_stock	以使用者實際的安裝路徑驗證，而非僅用本地 --plugin-dir；驗證後移除安裝	docs/v2/evidence/final/install-from-github.log	0050.TW 元大台灣50
+2026-11-21T04:34:47Z	audit	決策紀錄由獨立 reviewer（sonnet）稽核；補上偷看策略無法獲利的測試、子行程資料指紋比對、lightweight-charts sha256 鎖定，並修正設計文件的安裝指令	Done means 對 look-ahead 的描述要求「偷看策略無法得利」；資料一致性改為執行期檢查而非僅靠測試	tests test_peeking_strategy_cannot_profit / test_vendored_chart_library_is_pinned; 故意改動子行程指紋時 9 個 runner 測試失敗	107 passed
+2026-11-21T04:34:47Z	audit	未發佈至 PyPI，安裝改以 git 來源與 plugin marketplace	發佈 PyPI 為對外且難以撤回的動作，留待使用者決定	docs/v2/design.md 第 5 節	需使用者決定
