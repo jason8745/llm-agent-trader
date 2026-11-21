@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C · Scorecards</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#ffffff;--soft:#f4f6f8;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--accent:#4f46e5;--up:#dc2626;--down:#16a34a;--warn:#d97706;--mono:'Geist Mono',monospace}
+*{box-sizing:border-box;margin:0}
+body{font-family:'Geist',system-ui,sans-serif;background:var(--soft);color:var(--ink);font-size:14px}
+.up{color:var(--up)}.down{color:var(--down)}
+header{background:var(--bg);border-bottom:1px solid var(--line);padding:18px 32px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+header h1{font-size:18px;font-weight:700}
+.chips{display:flex;gap:6px}
+.chips button{all:unset;padding:6px 12px;border-radius:999px;border:1px solid var(--line);cursor:pointer;font-size:13px;color:var(--muted)}
+.chips button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+header .sym{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.best{max-width:1200px;margin:24px auto 0;padding:0 32px;color:var(--muted)}
+.best b{color:var(--ink)}
+.grid{max-width:1200px;margin:16px auto 40px;padding:0 32px;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.card{all:unset;box-sizing:border-box;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:18px;cursor:pointer;display:flex;flex-direction:column;gap:12px;transition:border-color .15s}
+.card:hover,.card:focus-visible{border-color:var(--accent)}
+.top{display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.badge{font-family:'Geist';font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:#fef3c7;color:var(--warn)}
+.badge.ok{background:#e0e7ff;color:var(--accent)}
+.hyp{font-size:15px;line-height:1.45;min-height:44px}
+.bars{display:grid;gap:6px}
+.row{display:grid;grid-template-columns:44px 1fr 56px;align-items:center;gap:8px;font-family:var(--mono);font-size:12px}
+.row .track{height:8px;background:var(--soft);border-radius:4px;position:relative;overflow:hidden}
+.row .track i{position:absolute;top:0;bottom:0;border-radius:4px}
+.row .track:after{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--line)}
+.row b{text-align:right;font-weight:500}
+dialog{border:0;border-radius:14px;padding:0;width:min(1040px,94vw);max-height:92vh;box-shadow:0 24px 64px rgba(15,23,42,.25)}
+dialog::backdrop{background:rgba(15,23,42,.4)}
+.dlg{padding:24px 28px;overflow:auto;max-height:92vh}
+.dlg header{all:unset;display:flex;justify-content:space-between;align-items:start;gap:16px}
+.dlg h2{font-size:20px}.dlg p{color:var(--muted);margin-top:4px;line-height:1.5}
+.dlg .x{all:unset;cursor:pointer;font-size:22px;color:var(--muted);padding:0 6px}
+.kp{display:flex;gap:28px;margin:18px 0;flex-wrap:wrap}.kp small{display:block;font-size:12px;color:var(--muted)}.kp div{font-size:24px;font-weight:700}
+.two{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;margin-top:16px}
+h3{font-size:13px;color:var(--muted);font-weight:500;margin-bottom:8px}
+table.trades{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+.trades th,.trades td{text-align:left;padding:6px;border-bottom:1px solid var(--line)}.trades .n{text-align:right}.trades tr.oos{background:#eef2ff}
+pre{font-family:var(--mono);font-size:12px;background:var(--soft);padding:14px;border-radius:8px;overflow:auto}
+@media(max-width:760px){header,.grid,.best{padding-left:16px;padding-right:16px}.two{grid-template-columns:1fr}}
+</style></head><body>
+<header><h1>Agent Trader</h1><div class="chips" id="chips"></div><span class="sym">2330.TW 台積電 · 6 runs</span></header>
+<p class="best" id="best"></p>
+<div class="grid" id="grid"></div>
+<dialog id="dlg"><div class="dlg" id="dbody"></div></dialog>
+<script src="mock.js"></script>
+<script>
+const th={up:'#dc2626',dn:'#16a34a',eq:'#4f46e5',bh:'#94a3b8',grid:'#e2e8f0',text:'#64748b',oos:'rgba(79,70,229,.05)',font:'Geist Mono',bg:'#fff'};
+let filt='';
+const strats=['',...new Set(RUNS.map(r=>r.strategy))];
+const bar=(lbl,v,c)=>{const w=Math.min(50,Math.abs(v)/0.3*50);return `<div class="row"><span>${lbl}</span><span class="track"><i style="${v>=0?`left:50%`:`right:50%`};width:${w}%;background:${c}"></i></span><b class="${tone(v)}">${pct(v)}</b></div>`};
+function render(){
+  chips.innerHTML=strats.map(s=>`<button aria-pressed="${s===filt}" data-f="${s}">${s||'全部'}</button>`).join('');
+  const rs=RUNS.filter(r=>!filt||r.strategy===filt);
+  const best=[...rs].sort((a,b)=>b.oos.ret-a.oos.ret)[0];
+  document.getElementById('best').innerHTML=`OOS 最佳：<b>${best.id} ${best.strategy}</b> ${pct(best.oos.ret)}，同期 buy & hold ${pct(best.bhOos.ret)}`;
+  grid.innerHTML=rs.map(r=>`<button class="card" data-r="${r.id}">
+    <div class="top"><span>${r.id} · ${r.strategy} · ${r.at}</span>${overfit(r)?'<span class="badge">疑似過擬合</span>':'<span class="badge ok">IS≈OOS</span>'}</div>
+    <div class="hyp">${r.hyp}</div>
+    ${sparkSVG(r,th)}
+    <div class="bars">${bar('IS',r.is.ret,'#a5b4fc')}${bar('OOS',r.oos.ret,'#4f46e5')}${bar('B&H',r.bhOos.ret,'#cbd5e1')}</div></button>`).join('');
+}
+function open(r){
+  dbody.innerHTML=`<header><div><h2>${r.strategy} · ${r.id}</h2><p>${r.hyp}</p></div><button class="x" aria-label="關閉" data-close>×</button></header>
+  <div class="kp"><div><small>OOS 報酬</small><div class="${tone(r.oos.ret)}">${pct(r.oos.ret)}</div></div><div><small>B&H OOS</small><div>${pct(r.bhOos.ret)}</div></div>
+  <div><small>IS 報酬</small><div class="${tone(r.is.ret)}">${pct(r.is.ret)}</div></div><div><small>最大回撤</small><div>${pct(Math.min(r.is.mdd,r.oos.mdd))}</div></div>
+  <div><small>交易 / 勝率</small><div>${r.nTrades} / ${(r.win*100).toFixed(0)}%</div></div></div>
+  ${chartSVG(r,th)}
+  <div class="two"><div><h3>交易明細</h3>${tradesTable(r)}</div><div><h3>策略原始碼（run 當下快照）</h3><pre>${esc(source(r))}</pre></div></div>`;
+  dlg.showModal();
+}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-f],[data-r],[data-close]');
+  if(e.target===dlg||t?.dataset.close!==undefined&&t)return dlg.close();
+  if(!t)return;if(t.dataset.r)return open(RUNS.find(r=>r.id===t.dataset.r));filt=t.dataset.f;render()});
+render();
+</script></body></html>
