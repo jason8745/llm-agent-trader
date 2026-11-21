@@ -10,6 +10,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="cmd")
     sub.add_parser("mcp", help="run the MCP server on stdio")
+    ui = sub.add_parser("ui", help="serve the run viewer for this workspace")
+    ui.add_argument("--port", type=int, default=None)
 
     bt = sub.add_parser("backtest", help="backtest a strategy file")
     bt.add_argument("strategy")
@@ -34,6 +36,10 @@ def main(argv: list[str] | None = None) -> None:
         from trader.mcp_server import main as serve
 
         serve()
+    elif args.cmd == "ui":
+        from trader import viewer
+
+        viewer.serve(ws, args.port or VIEWER_PORT)
     elif args.cmd == "backtest":
         try:
             run = runner.run_backtest(

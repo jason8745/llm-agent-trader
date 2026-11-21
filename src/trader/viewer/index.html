@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent Trader</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/lightweight-charts.js"></script>
+</head>
+<body>
+<header class="bar"><b>▍AGENT TRADER</b><span id="ws" class="muted"></span><span class="sp"></span><span class="muted">樣本內 70% / 樣本外 30% · 紅漲綠跌</span></header>
+<div class="split">
+  <nav class="list" aria-label="回測紀錄">
+    <div class="mode"><button data-mode="tl" aria-pressed="true">時間軸</button><button data-mode="rank" aria-pressed="false">排行</button></div>
+    <div id="lst"></div>
+  </nav>
+  <main class="detail" id="d"></main>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

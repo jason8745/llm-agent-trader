@@ -4,7 +4,7 @@ import os
 
 from mcp.server import MCPServer
 
-from trader import data, fmt, runner, store
+from trader import data, fmt, runner, store, viewer
 
 VIEWER_PORT = int(os.environ.get("TRADER_VIEWER_PORT", "8765"))
 
@@ -27,6 +27,14 @@ server = MCPServer("llm-agent-trader", instructions=INSTRUCTIONS)
 
 def _ws():
     return runner.workspace()
+
+
+def _port() -> int:
+    """Start (or reuse) this workspace's viewer so every link the agent hands out opens."""
+    try:
+        return viewer.ensure_running(_ws(), VIEWER_PORT)
+    except OSError:
+        return VIEWER_PORT
 
 
 @server.tool()
@@ -91,7 +99,7 @@ def run_backtest(
         )
     except runner.RunError as e:
         return f"回測失敗：{e}"
-    return fmt.run_text(run, VIEWER_PORT)
+    return fmt.run_text(run, _port())
 
 
 @server.tool()
@@ -103,7 +111,7 @@ def get_run(run_id: int) -> str:
     led = run.payload["ledger"]
     return "\n\n".join(
         [
-            fmt.run_text(run, VIEWER_PORT),
+            fmt.run_text(run, _port()),
             "成交明細\n" + fmt.fills_markdown(led["fills"]),
             "已平倉交易\n" + fmt.round_trips_markdown(led["round_trips"]),
             f"資料指紋：{run.data_sha}\n策略原始碼 sha256：{run.source_sha}",

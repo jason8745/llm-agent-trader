@@ -50,7 +50,8 @@ def test_mcp_tools_over_stdio(ws):
     assert "2330.TW" in found and "台積電" in found
     run_id = int(re.search(r"回測 #(\d+)", result).group(1))
     run = store.get(ws, run_id)
-    assert result == fmt.run_text(run, 8765)
+    port = int(re.search(r"127\.0\.0\.1:(\d+)/runs/", result).group(1))
+    assert result == fmt.run_text(run, port)
     assert HYP in listing
 
 
