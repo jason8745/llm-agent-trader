@@ -237,6 +237,41 @@
         "type": "object",
         "title": "list_runsOutput"
       }
+    },
+    {
+      "description": "Start this workspace's dashboard if needed, open it in the default browser, and return its URL.\n\n    The dashboard lists every run in the workspace and shows new runs without a reload.\n    Pass run_id to open one run.\n    ",
+      "inputSchema": {
+        "properties": {
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Run Id"
+          }
+        },
+        "type": "object",
+        "title": "open_dashboardArguments"
+      },
+      "name": "open_dashboard",
+      "outputSchema": {
+        "properties": {
+          "result": {
+            "title": "Result",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "type": "object",
+        "title": "open_dashboardOutput"
+      }
     }
   ]
 }

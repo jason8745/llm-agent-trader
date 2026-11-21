@@ -66,7 +66,14 @@ def test_handshake_is_instant_while_the_real_server_starts(ws):
 
     ready, tools, (waited, out) = through_launcher(SLOW_REAL, work)
     assert ready < 3, f"handshake took {ready:.1f}s; the real server must not block it"
-    assert tools == ["search_stock", "get_ohlcv", "run_backtest", "get_run", "list_runs"]
+    assert tools == [
+        "search_stock",
+        "get_ohlcv",
+        "run_backtest",
+        "get_run",
+        "list_runs",
+        "open_dashboard",
+    ]
     assert waited > 2, "the first call waits for the real server"
     assert "回測 #1" in out and "樣本外" in out
 

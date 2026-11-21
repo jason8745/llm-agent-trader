@@ -16,6 +16,7 @@ description: 台股交易策略研究與回測。使用者想討論交易策略�
 | `run_backtest` | 回測策略檔；必須填寫 `hypothesis` |
 | `get_run` | 讀取單次回測的成交明細、已平倉交易、資料指紋與策略原始碼快照 |
 | `list_runs` | 列出此專案的所有回測，比較迭代結果 |
+| `open_dashboard` | 啟動並在瀏覽器開啟檢視器；使用者要求打開 dashboard 或檢視器時使用 |
 
 ## 研究流程
 

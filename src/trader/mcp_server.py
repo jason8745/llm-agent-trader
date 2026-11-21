@@ -1,6 +1,7 @@
 """MCP tools over stdio. Every number in a tool result comes from trader.profit via trader.fmt."""
 
 import os
+import webbrowser
 
 from mcp.server import MCPServer
 
@@ -124,6 +125,22 @@ def get_run(run_id: int) -> str:
 def list_runs(strategy: str | None = None, symbol: str | None = None) -> str:
     """All runs in this workspace, oldest first, optionally filtered."""
     return fmt.runs_markdown(store.list_runs(_ws(), strategy, symbol))
+
+
+@server.tool()
+def open_dashboard(run_id: int | None = None) -> str:
+    """Start this workspace's dashboard if needed, open it in the default browser, and return its URL.
+
+    The dashboard lists every run in the workspace and shows new runs without a reload.
+    Pass run_id to open one run.
+    """
+    port = _port()
+    url = fmt.viewer_url(run_id, port) if run_id else f"http://127.0.0.1:{port}/"
+    if run_id and store.get(_ws(), run_id) is None:
+        return f"查無回測 #{run_id}。檢視器：http://127.0.0.1:{port}/"
+    opened = webbrowser.open(url)
+    note = "已在預設瀏覽器開啟。" if opened else "無法自動開啟瀏覽器，請手動開啟此連結。"
+    return f"檢視器：{url}\n{note}新的回測完成後，頁面會自動顯示，不需要重新整理。"
 
 
 def main() -> None:
