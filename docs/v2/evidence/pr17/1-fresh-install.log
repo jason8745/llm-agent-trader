@@ -1,0 +1,8 @@
+$ claude plugin marketplace add jason8745/llm-agent-trader#fix/plugin-mcp-in-manifest
+✔ Successfully added marketplace: llm-agent-trader (declared in user settings)
+$ claude plugin install llm-agent-trader@llm-agent-trader
+Installing plugin "llm-agent-trader@llm-agent-trader"...✔ Successfully installed plugin: llm-agent-trader@llm-agent-trader (scope: user)
+$ claude mcp list   (fresh config, empty uv cache)
+Checking MCP server health…
+
+plugin:llm-agent-trader:trader: uv run --no-project --python >=3.9 <fresh>/cfg/plugins/cache/llm-agent-trader/llm-agent-trader/2.1.0/src/trader/mcp_launcher.py - ✔ Connected
