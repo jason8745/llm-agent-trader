@@ -3,3 +3,8 @@ ts	phase	decision	why	evidence	result
 2026-11-21T03:46:15Z	archive	v1 封存為 archive/v1 分支與 v1 annotated tag，master 經由 PR 改為 v2	使用者要求保留舊版；以分支取代原先的 v2 分支方案，master 直接收斂到目標架構	branch archive/v1, tag v1 @68b2741	done
 2026-11-21T03:46:15Z	plan	PR 依序為 docs、刪除 v1 與骨架、engine/profit、資料層、MCP/CLI、檢視器、plugin/skill	先刪除再建構；先做有測試的純函式核心，再接外部邊界	docs/v2/design.md	open
 2026-11-21T03:49:40Z	scaffold	刪除 v1 全部程式碼（backend、frontend、Makefile、LLM 設定），建立 src/trader 套件與 CI	先刪除再建構，v1 已封存於 archive/v1，不需保留相容層	docs/v2/evidence/pr2/local-checks.log	ruff + pytest 通過
+2026-11-21T03:57:27Z	engine	只在目標比例改變時調整部位，比例相同時不再平衡	避免分數比例造成每日微量交易與最低手續費侵蝕	src/trader/engine.py simulate	已寫入 design.md 4.3
+2026-11-21T03:57:27Z	engine	報酬率以初始本金為基準，MDD 峰值自初始本金起算	使 (1+IS)(1+OOS)=1+總報酬率 恆成立，並讓 B&H 的進場手續費反映在報酬率	tests/test_engine.py test_ledger_invariants	tests green
+2026-11-21T03:57:27Z	engine	指標以 TA-Lib 0.8.3 產生的 fixture 驗證，MACD 快線種子依 TA-Lib 對齊	外部權威參考值比自寫參考實作可信；MACD 初版與 TA-Lib 差 0.118，查明為種子位置差異	tests/fixtures/gen_talib_reference.py	13 個指標案例通過
+2026-11-21T03:57:27Z	engine	植入 7 種已知錯誤驗證測試有效	證明測試能抓到錯誤而非恆過	scripts/mutation_check.sh, docs/v2/evidence/pr3/mutation-check.log	7/7 killed
+2026-11-21T03:57:27Z	review	獨立 reviewer（sonnet）審查數字邏輯：修正可負擔股數少 1 股與目標股數浮點誤差；駁回 RSI 平盤與除息日賣出兩點	RSI 平盤以 TA-Lib 實測為 50；除息日前一日收盤持有者有權領取股利，即使除息日開盤賣出	commit on v2/engine, tests test_buys_every_affordable_share / test_fractional_target_survives_float_noise	新測試舊碼紅、新碼綠
