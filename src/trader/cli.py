@@ -10,21 +10,21 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="cmd")
     sub.add_parser("mcp", help="run the MCP server on stdio")
-    ui = sub.add_parser("ui", help="serve the run viewer for this workspace")
+    ui = sub.add_parser("ui", help="serve the viewer for this workspace")
     ui.add_argument("--port", type=int, default=None)
 
     bt = sub.add_parser("backtest", help="backtest a strategy file")
     bt.add_argument("strategy")
     bt.add_argument("symbol")
-    bt.add_argument("start")
-    bt.add_argument("end")
+    for name in ("dev_start", "dev_end", "exec_start", "exec_end"):
+        bt.add_argument(name, help="YYYY-MM-DD")
     bt.add_argument("--hypothesis", required=True)
     bt.add_argument("--params", type=json.loads, default=None, help="JSON, e.g. '{\"fast\": 5}'")
     bt.add_argument("--cash", type=float, default=runner.DEFAULT_CASH)
 
-    show = sub.add_parser("show", help="print one run")
+    show = sub.add_parser("show", help="print one backtest")
     show.add_argument("run_id", type=int)
-    sub.add_parser("runs", help="list runs in this workspace")
+    sub.add_parser("runs", help="list backtests in this workspace, grouped by study")
     search = sub.add_parser("search", help="find a Taiwan stock or ETF")
     search.add_argument("query")
 
@@ -46,8 +46,10 @@ def main(argv: list[str] | None = None) -> None:
                 ws,
                 args.strategy,
                 args.symbol,
-                args.start,
-                args.end,
+                args.dev_start,
+                args.dev_end,
+                args.exec_start,
+                args.exec_end,
                 args.hypothesis,
                 params=args.params,
                 cash=args.cash,
@@ -61,7 +63,7 @@ def main(argv: list[str] | None = None) -> None:
             sys.exit(f"no run #{args.run_id}")
         print(fmt.run_text(run, VIEWER_PORT))
     elif args.cmd == "runs":
-        print(fmt.runs_markdown(store.list_runs(ws)))
+        print(fmt.runs_markdown(store.list_runs(ws), store.list_studies(ws)))
     elif args.cmd == "search":
         from trader.mcp_server import search_stock
 

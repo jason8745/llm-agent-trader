@@ -13,7 +13,7 @@ from trader.engine import (
     fees_for,
     simulate,
 )
-from trader.profit import report
+from trader.profit import metrics, study_report, trades
 
 
 def scripted(*targets):
@@ -62,21 +62,15 @@ def test_golden_buy_and_hold():
     assert bh.equity == [99_858, 101_854, 103_850, 102_852, 105_846, 107_842]
 
 
-def test_golden_report():
+def test_golden_metrics():
     bars, led = golden()
-    r = report(led, buy_and_hold(bars, TW_STOCK_FEES, 100_000))
-    assert r.split == 4  # floor(0.7 * 6)
-    assert r.total.ret == pytest.approx(100_401 / 100_000 - 1, abs=1e-12)
-    assert r.in_sample.ret == pytest.approx(101_834 / 100_000 - 1, abs=1e-12)
-    assert r.out_of_sample.ret == pytest.approx(100_401 / 101_834 - 1, abs=1e-12)
-    assert r.in_sample.mdd == pytest.approx(101_834 / 102_822 - 1, abs=1e-12)
-    assert r.out_of_sample.mdd == pytest.approx(100_401 / 101_834 - 1, abs=1e-12)
-    assert r.total.mdd == pytest.approx(100_401 / 102_822 - 1, abs=1e-12)
-    assert r.bh_total.ret == pytest.approx(0.07842, abs=1e-12)
-    assert r.bh_in_sample.ret == pytest.approx(0.02852, abs=1e-12)
-    assert r.bh_out_of_sample.ret == pytest.approx(107_842 / 102_852 - 1, abs=1e-12)
-    assert r.trades == 1 and r.win_rate == 1.0
-    assert r.final_equity == 100_401 and r.unrealized_pnl == 0
+    m, t = metrics(led), trades(led)
+    bh = metrics(buy_and_hold(bars, TW_STOCK_FEES, 100_000))
+    assert m.ret == pytest.approx(100_401 / 100_000 - 1, abs=1e-12)
+    assert m.mdd == pytest.approx(100_401 / 102_822 - 1, abs=1e-12)
+    assert bh.ret == pytest.approx(0.07842, abs=1e-12)
+    assert t.count == 1 and t.win_rate == 1.0
+    assert m.final_equity == 100_401 and led.unrealized_pnl == 0
 
 
 @pytest.mark.parametrize(
@@ -148,10 +142,6 @@ def test_ledger_invariants(strategy, seed, fees):
         assert led.cash[t] >= -1e-9, "cash never goes negative"
     assert led.equity[-1] - led.initial_cash == pytest.approx(
         led.realized_pnl + led.unrealized_pnl, abs=1e-6
-    )
-    r = report(led, buy_and_hold(bars, fees, 1_000_000))
-    assert (1 + r.in_sample.ret) * (1 + r.out_of_sample.ret) == pytest.approx(
-        1 + r.total.ret, rel=1e-12
     )
     for f in led.fills:
         assert f.commission == fees.commission(f.gross)
@@ -232,21 +222,28 @@ def test_fractional_target_survives_float_noise():
 def test_overfit_flag_compares_annualized_returns():
     from trader.profit import annualize
 
-    # 2330.TW run: +63.64% over ~2 years in sample, +48.10% over ~10 months out of sample.
-    is_ann = annualize(0.6364, "2023-01-03", "2025-02-14")
-    oos_ann = annualize(0.4810, "2025-02-14", "2025-12-31")
-    assert is_ann < oos_ann, "better annualized out of sample is not overfitting"
+    # 2330.TW run: +63.64% over ~2 years of development, +48.10% over ~10 months of execution.
+    dev_ann = annualize(0.6364, "2023-01-03", "2025-02-14")
+    exec_ann = annualize(0.4810, "2025-02-14", "2025-12-31")
+    assert dev_ann < exec_ann, "better annualized in execution is not overfitting"
     assert annualize(0.21, "2024-01-01", "2025-01-01") == pytest.approx(0.21, abs=1e-3)
     assert annualize(0.1, "2025-01-01", "2025-01-01") is None
 
 
-def test_overfit_flag_fires_when_out_of_sample_collapses():
-    n = 300
-    s = int(0.7 * n)
+def test_overfit_flag_fires_when_execution_collapses():
+    n, s = 300, 210
     closes = [100 * 1.002**t for t in range(s)] + [100 * 1.002 ** (s - 1)] * (n - s)
     bars = make_bars(closes, closes)
-    r = report(simulate(bars, lambda _h, _p: 1.0, NO_FEES, 1e6), buy_and_hold(bars, NO_FEES, 1e6))
-    assert r.out_of_sample.ret == pytest.approx(0, abs=0.01) and r.in_sample.ret > 0.3
+    hold = lambda _h, _p: 1.0  # noqa: E731
+    dev = simulate(bars.iloc[:s], hold, NO_FEES, 1e6)
+    exe = simulate(bars, hold, NO_FEES, 1e6, start=s)
+    r = study_report(
+        dev,
+        buy_and_hold(bars.iloc[:s], NO_FEES, 1e6),
+        exe,
+        buy_and_hold(bars, NO_FEES, 1e6, start=s),
+    )
+    assert r.exec.strategy.ret == pytest.approx(0, abs=0.01) and r.dev.strategy.ret > 0.3
     assert r.overfit
 
 

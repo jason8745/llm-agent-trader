@@ -7,7 +7,7 @@ import sys
 import time
 from pathlib import Path
 
-from conftest import END, START, SYMBOL
+from conftest import BT, SYMBOL
 from mcp import Client, StdioServerParameters
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,8 +57,7 @@ def test_handshake_is_instant_while_the_real_server_starts(ws):
             {
                 "strategy": "ma_cross",
                 "symbol": SYMBOL,
-                "start": START,
-                "end": END,
+                **BT,
                 "hypothesis": "以 5 日與 20 日均線交叉作為基準策略。",
             },
         )
@@ -72,10 +71,11 @@ def test_handshake_is_instant_while_the_real_server_starts(ws):
         "run_backtest",
         "get_run",
         "list_runs",
+        "finalize_study",
         "open_dashboard",
     ]
     assert waited > 2, "the first call waits for the real server"
-    assert "回測 #1" in out and "樣本外" in out
+    assert "回測 #1" in out and "策略執行期間" in out
 
 
 def test_reports_a_server_that_cannot_start(ws):

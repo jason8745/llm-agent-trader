@@ -1,5 +1,5 @@
 #!/bin/bash
-# Plants known bugs in the engine and profit modules; each one must make the test suite fail.
+# Plants known bugs in the engine, runner and profit modules; each one must make the test suite fail.
 set -u
 cd "$(dirname "$0")/.."
 mutate() {
@@ -15,6 +15,7 @@ mutate src/trader/engine.py 'decide(bars.iloc[: t + 1].copy(), pos)' 'decide(bar
 mutate src/trader/engine.py 'float(math.floor(amount + _FLOOR_EPS))' 'float(round(amount))' "fees rounded instead of floored"
 mutate src/trader/engine.py 'max(self._round(gross * self.commission_rate), self.min_commission)' 'self._round(gross * self.commission_rate)' "minimum commission ignored"
 mutate src/trader/engine.py 'cash += div_cash' 'pass' "dividends not credited"
-mutate src/trader/profit.py 'segment(e[s - 1], e[s - 1 :])' 'segment(e[s], e[s:])' "out-of-sample starts one bar late"
-mutate src/trader/profit.py 'peak = max(peak, v)' 'peak = v' "drawdown measured from previous bar"
+mutate src/trader/runner.py 'start=job["exec_start"])' 'start=job["exec_start"] + 1)' "execution starts one bar late"
+mutate src/trader/runner.py 'simulate(bars.iloc[: job["dev_bars"]]' 'simulate(bars' "development sees execution bars"
+mutate src/trader/profit.py '            peak, peak_i = v, t' '            peak_i = t' "drawdown peak never rises"
 exit $status
