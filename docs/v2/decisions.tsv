@@ -17,3 +17,7 @@ ts	phase	decision	why	evidence	result
 2026-11-21T04:19:48Z	viewer	前端禁止格式化數字（以測試檢查 toFixed、toLocaleString、Intl）	將單一 formatter 規則寫成可執行的檢查，而非僅靠文件約定	tests/test_viewer.py test_frontend_never_formats_numbers	tests green
 2026-11-21T04:19:48Z	viewer	lightweight-charts 固定為 5.2.1（5.3.0 發佈未滿兩週）	避免採用剛發佈的版本	src/trader/viewer/lightweight-charts.js sha256 e21cc5ca	vendored
 2026-11-21T04:21:32Z	security	檢視器只接受 Host 為 127.0.0.1:port 或 localhost:port 的請求	自動安全審查指出 DNS rebinding 可讀取策略原始碼與路徑；修正成本低	tests/test_viewer.py test_rejects_foreign_host_headers	403 on foreign hosts
+2026-11-21T04:29:02Z	plugin	plugin 的 MCP 以 uvx --from ${CLAUDE_PLUGIN_ROOT} 啟動	plugin 安裝時已 clone 整個 repo，MCP 版本永遠與 plugin 一致，且本地 --plugin-dir 測試可直接使用	.mcp.json, docs/v2/evidence/pr7/plugin-validate.log	validate passed
+2026-11-21T04:29:02Z	skill	真實 Claude session 第一次出現口語（方向對了、多賺、掉到等），於 skill 加入正式書面語改寫範例後重跑	術語表不足以約束語氣；以實際觀察到的用語作為範例與自動檢查項目	docs/v2/evidence/pr7/claude-session-before-rewrites.md, claude-session.md	改寫前檢查失敗 7 項，改寫後通過
+2026-11-21T04:29:02Z	privacy	證據檔與 PR 描述移除本機路徑；新增 sanitize_evidence.py	早期證據含本機使用者名稱路徑；已 merge 的 commit 歷史仍含該路徑，改寫需 force push，交由使用者決定	scripts/sanitize_evidence.py, PR #5 #6 #7 描述已更新	需使用者決定是否改寫歷史
+2026-11-21T04:29:02Z	e2e	端到端 session 於使用者本機環境執行，載入了使用者其他 plugin	無法在不影響登入狀態下隔離環境；於 PR 註明	docs/v2/evidence/pr7/claude-session.md	noted
