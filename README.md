@@ -6,7 +6,7 @@
 
 *English summary at the [end of this page](#english).*
 
-[![觀看 40 秒 demo](docs/images/demo-poster.jpg)](https://github.com/jason8745/llm-agent-trader/releases/download/v2.4.3/llm-agent-trader-demo.mp4)
+https://github.com/user-attachments/assets/302b4b27-0123-4f33-9b11-6b6c69221360
 
 影片為一次真實的 Claude Code 操作：說「開始使用台股回測」、用選項卡片確認條件、用自己的話加上停損，Claude 自動實驗並定稿，dashboard 同步呈現結果。
 
@@ -196,7 +196,7 @@ uv run python scripts/build_stock_list.py
 
 A Taiwan stock backtesting harness for Claude. You discuss a strategy in chat; Claude writes it, backtests it on a deterministic engine, and explains the result on a live dashboard. Every number is computed by the engine, never by the model. Each backtest has a development period for tuning and a later execution period that simulates live use, both compared with buy-and-hold, so overfitting is visible. Conclusions are stored as a verdict plus findings paired with insights, and every number in them is verified against the tool output.
 
-Demo video (40 s, real session): [llm-agent-trader-demo.mp4](https://github.com/jason8745/llm-agent-trader/releases/download/v2.4.3/llm-agent-trader-demo.mp4).
+Demo video (40 s, real session): see the top of this page.
 
 Install: in Claude Desktop, download the `.mcpb` from [Releases](https://github.com/jason8745/llm-agent-trader/releases/latest) and double-click it, then say 「開始使用台股回測」. In Claude Code: `claude plugin marketplace add jason8745/llm-agent-trader` and `claude plugin install llm-agent-trader@llm-agent-trader`.
 
