@@ -135,10 +135,13 @@ class Overlay {
           for (const l of this.labels) {
             const x1 = ts.timeToCoordinate(l.start), x2 = ts.timeToCoordinate(l.end);
             if (x1 === null || x2 === null || x2 - x1 < (l.min || 60)) continue;
+            ctx.save();
+            ctx.beginPath(); ctx.rect(x1 * k, 0, (x2 - x1 - 4) * k, 40 * k); ctx.clip();
             ctx.font = `${11 * k}px -apple-system,"PingFang TC",sans-serif`;
             ctx.fillStyle = l.color || "rgba(230,232,235,0.85)";
             ctx.fillText(l.text, (x1 + 6) * k, 14 * k);
             if (l.sub) { ctx.font = `${10.5 * k}px ui-monospace,Menlo,monospace`; ctx.fillStyle = "rgba(138,147,160,0.95)"; ctx.fillText(l.sub, (x1 + 6) * k, 28 * k); }
+            ctx.restore();
           }
         }),
       }),
@@ -152,7 +155,7 @@ function makeChart(el) {
     layout: { background: { type: "solid", color: "#11141a" }, textColor: "#8a93a0", fontSize: 11, attributionLogo: false, panes: { separatorColor: "#252b34" } },
     grid: { vertLines: { color: "#1b2027" }, horzLines: { color: "#1b2027" } },
     rightPriceScale: { borderColor: "#252b34", minimumWidth: 86 },
-    timeScale: { borderColor: "#252b34" },
+    timeScale: { borderColor: "#252b34", minBarSpacing: 0.05 },
     localization: { locale: "zh-TW", dateFormat: "yyyy-MM-dd" },
     crosshair: { mode: 0 },
   });
@@ -210,19 +213,24 @@ function drawCharts(r) {
   }));
   area(ser(c.exec_dates, c.dd_exec), true);
 
-  charts = [price, cum, dd];
-  charts.forEach((ch) => ch.timeScale().fitContent());
-  let syncing = false;
-  for (const ch of charts) {
-    ch.timeScale().subscribeVisibleTimeRangeChange((range) => {
-      if (syncing || !range) return;
-      syncing = true;
-      for (const other of charts) if (other !== ch) other.timeScale().setVisibleRange(range);
-      syncing = false;
-    });
-    ch.subscribeCrosshairMove((p) => readout(c, p.time));
-  }
+  const mine = [price, cum, dd];
+  charts = mine;
+  mine.forEach((ch) => ch.subscribeCrosshairMove((p) => readout(c, p.time)));
   readout(c, null);
+  // Fit after layout so each chart has its real width, then start syncing the visible range.
+  requestAnimationFrame(() => {
+    if (charts !== mine) return;
+    mine.forEach((ch) => ch.timeScale().fitContent());
+    let syncing = false;
+    for (const ch of mine) {
+      ch.timeScale().subscribeVisibleTimeRangeChange((range) => {
+        if (syncing || !range) return;
+        syncing = true;
+        for (const other of mine) if (other !== ch) other.timeScale().setVisibleRange(range);
+        syncing = false;
+      });
+    }
+  });
 }
 
 function readout(c, time) {
@@ -256,8 +264,8 @@ function renderRight() {
     ${con && con.findings.length ? `<section class="card"><h3>發現與洞察</h3>${con.findings.map((f, i) => `
       <div class="fi"><div class="lab"><span class="n">${i + 1}</span>發現</div><p>${esc(f.finding)}</p><div class="ins"><b>洞察</b>${esc(f.insight)}</div></div>`).join("")}</section>` : ""}
     <section class="card"><h3>盤勢表現<span class="mu" style="font-weight:400">股價漲跌幅／策略報酬率</span></h3>
-      <div class="reg">${r.regimes.map((g) => `<span><span class="rdot ${g.kind}"></span>${esc(g.label)}</span><span class="mu" style="font-family:var(--mono);font-size:11px">${esc(g.start)} 至 ${esc(g.end)}</span>
-        <span style="font-family:var(--mono);font-size:11.5px"><span class="${tone(g.price_change)}">${esc(g.price_change)}</span> / <b class="${tone(g.strategy)}">${esc(g.strategy)}</b></span>`).join("")}</div></section>
+      <div class="reg">${r.regimes.map((g) => `<span><span class="rdot ${g.kind}"></span>${esc(g.label)}<small>${esc(g.start)} 至 ${esc(g.end)}</small></span>
+        <span class="vals"><span class="${tone(g.price_change)}">${esc(g.price_change)}</span> / <b class="${tone(g.strategy)}">${esc(g.strategy)}</b></span>`).join("")}</div></section>
     <section class="card"><details class="more"><summary>完整績效指標與交易統計</summary>
       ${table('<th></th><th class="n">開發</th><th class="n">執行</th><th class="n">持有（開發）</th><th class="n">持有（執行）</th>', M.map((m) => `<tr><th>${esc(m.label)}</th><td class="n ${tone(m.dev)}">${esc(m.dev)}</td><td class="n b ${tone(m.exec)}">${esc(m.exec)}</td><td class="n mu">${esc(m.bh_dev)}</td><td class="n mu">${esc(m.bh_exec)}</td></tr>`).join(""))}
       ${table('<th></th><th class="n">開發</th><th class="n">執行</th>', T.map((m) => `<tr><th>${esc(m.label)}</th><td class="n ${tone(m.dev)}">${esc(m.dev)}</td><td class="n b ${tone(m.exec)}">${esc(m.exec)}</td></tr>`).join(""))}
@@ -314,15 +322,19 @@ async function poll() {
   if (!t || sig(t) === signature) return;
   const before = newestRun();
   const following = !run || (before && run.id === before.id);
+  const finalBefore = study && study.final_run_id;
   tree = t;
   signature = sig(t);
   if (openStocks) t.forEach((s) => openStocks.add(s.symbol));
   const latest = newestRun();
-  if (following && latest && (!before || latest.id !== before.id)) {
-    await openRun(latest.id, false);
-    history.replaceState(null, "", `/runs/${latest.id}`);
-    return;
-  }
+  const go = async (id) => {
+    study = null; // reload the study so its iteration list and conclusion include the change
+    await openRun(id, false);
+    history.replaceState(null, "", `/runs/${id}`);
+  };
+  if (following && latest && (!before || latest.id !== before.id)) return go(latest.id);
+  const mine = study && t.flatMap((s) => s.studies).find((st) => st.key === study.key);
+  if (following && mine && mine.final_run_id && mine.final_run_id !== finalBefore) return go(mine.final_run_id);
   if (study) {
     const fresh = await getJSON(`/api/studies/${encodeURIComponent(study.key)}`);
     if (fresh) { study = fresh; renderCenter(); renderRight(); }

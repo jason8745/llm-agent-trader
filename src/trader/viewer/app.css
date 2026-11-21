@@ -74,7 +74,9 @@ button{font:inherit;color:inherit}button:focus-visible,summary:focus-visible,a:f
 .fi .lab .n{font-family:var(--mono);color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:0 5px}
 .fi p{font-size:13px;line-height:1.65}
 .fi .ins{margin-top:6px;background:rgba(240,180,41,.07);border-radius:6px;padding:7px 9px;font-size:13px;line-height:1.65}.fi .ins b{color:var(--accent);font-weight:600;margin-right:4px}
-.reg{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;font-size:12px;align-items:center}
+.reg{display:grid;grid-template-columns:1fr auto;gap:8px 10px;font-size:12px;align-items:center}
+.reg small{display:block;font-family:var(--mono);font-size:10.5px;color:var(--muted);margin:1px 0 0 14px;white-space:nowrap}
+.reg .vals{font-family:var(--mono);font-size:11.5px;white-space:nowrap;text-align:right}
 .rdot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:middle}.rdot.up{background:var(--up)}.rdot.down{background:var(--down)}.rdot.range{background:#94a3b8}
 details.more summary{cursor:pointer;color:var(--muted);font-size:12px;list-style:none}details.more summary::-webkit-details-marker{display:none}
 details.more summary::before{content:"▸ "}details.more[open] summary::before{content:"▾ "}
@@ -87,5 +89,5 @@ pre{font-family:var(--mono);font-size:12px;background:#11141a;border:1px solid v
 .meta{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px;word-break:break-all}
 .empty{padding:40px 20px;color:var(--muted);line-height:1.8}
 @media(max-width:1280px){.desk{grid-template-columns:240px minmax(0,1fr) 340px}.kpis{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:960px){body{height:auto;overflow:auto}#ws,#legacy,.topbar a{display:none}.desk{grid-template-columns:1fr}.side{max-height:40vh;border-right:0;border-bottom:1px solid var(--line)}.right{border-left:0;border-top:1px solid var(--line)}.center{overflow:visible}}
+@media(max-width:960px){body{height:auto;overflow:auto}.charts{display:flex;flex-direction:column;min-height:0}.panel #c1{flex:none;height:380px}.panel #c2{flex:none;height:230px}.panel #c3{flex:none;height:170px}.kpi .v{font-size:20px}#ws,#legacy,.topbar a{display:none}.desk{grid-template-columns:1fr}.side{max-height:40vh;border-right:0;border-bottom:1px solid var(--line)}.right{border-left:0;border-top:1px solid var(--line)}.center{overflow:visible}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
