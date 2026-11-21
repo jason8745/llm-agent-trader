@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A · Research Notebook</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f3ee;--card:#fffdf9;--ink:#26231f;--muted:#6f675c;--rule:#e4ddd2;--accent:#b4532a;--up:#c0392b;--down:#1e8449;--mono:'Geist Mono',monospace;--serif:'Instrument Serif',serif}
+*{box-sizing:border-box;margin:0}
+body{font-family:'Geist',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+.up{color:var(--up)}.down{color:var(--down)}
+header{padding:20px 32px;border-bottom:1px solid var(--rule);display:flex;align-items:baseline;gap:16px}
+header b{font-family:var(--serif);font-size:24px;font-weight:400}
+header span{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.wrap{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 66px)}
+aside{border-right:1px solid var(--rule);padding:20px 16px}
+aside h4{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:500;margin:0 8px 8px}
+aside button{all:unset;display:block;width:100%;box-sizing:border-box;padding:10px 8px;border-radius:6px;cursor:pointer}
+aside button[aria-current=true]{background:var(--card);box-shadow:inset 3px 0 0 var(--accent)}
+aside button small{display:block;color:var(--muted);font-family:var(--mono);font-size:11px;margin-top:2px}
+main{padding:28px 40px;max-width:1100px}
+h1{font-family:var(--serif);font-weight:400;font-size:34px}
+.lede{color:var(--muted);margin:4px 0 24px}
+ol.timeline{list-style:none;padding:0;position:relative}
+ol.timeline:before{content:"";position:absolute;left:15px;top:8px;bottom:8px;width:1px;background:var(--rule)}
+.step{position:relative;padding:0 0 0 48px;margin-bottom:12px}
+.step .n{position:absolute;left:0;top:14px;width:31px;height:31px;border-radius:50%;background:var(--bg);border:1px solid var(--rule);display:grid;place-items:center;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.step button{all:unset;display:block;width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:14px 18px;cursor:pointer}
+.step[aria-current=true] .n{background:var(--accent);color:#fff;border-color:var(--accent)}
+.step[aria-current=true] button{border-color:var(--accent)}
+.hyp{font-family:var(--serif);font-size:19px;line-height:1.35}
+.meta{display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.meta b{font-weight:500}
+.warn{color:var(--accent)}
+.detail{background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:20px;margin:4px 0 20px 48px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.kpi{border-top:2px solid var(--rule);padding-top:8px}.kpi.main{border-color:var(--accent)}
+.kpi small{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em}
+.kpi div{font-size:22px;font-weight:600;margin-top:2px}
+.tabs{display:flex;gap:4px;margin:16px 0 8px;border-bottom:1px solid var(--rule)}
+.tabs button{all:unset;padding:8px 12px;cursor:pointer;color:var(--muted);font-size:13px}
+.tabs button[aria-selected=true]{color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+table.trades{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+.trades th,.trades td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--rule)}.trades .n{text-align:right}
+.trades tr.oos{background:#f6efe4}
+pre{font-family:var(--mono);font-size:12px;background:#2a2723;color:#f1ebe2;padding:16px;border-radius:6px;overflow:auto}
+@media(max-width:760px){.wrap{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--rule)}main{padding:20px 16px}.kpis{grid-template-columns:repeat(2,1fr)}.detail{margin-left:0}}
+</style></head><body>
+<header><b>Agent Trader</b><span>runs.db · 6 runs · last 11-21 10:02</span></header>
+<div class="wrap"><aside><h4>STRATEGIES</h4><div id="strats"></div></aside><main id="main"></main></div>
+<script src="mock.js"></script>
+<script>
+const th={up:'#c0392b',dn:'#1e8449',eq:'#b4532a',bh:'#8a8175',grid:'#e4ddd2',text:'#6f675c',oos:'rgba(180,83,42,.06)',font:'Geist Mono',bg:'#fffdf9'};
+let strat='ma_cross',sel=null,tab='trades';
+const strats=[...new Set(RUNS.map(r=>r.strategy))];
+function render(){
+  document.getElementById('strats').innerHTML=strats.map(s=>{const rs=RUNS.filter(r=>r.strategy===s);
+    return `<button aria-current="${s===strat}" data-s="${s}">${s}<small>${rs.length} iterations · ${rs[0].symbol}</small></button>`}).join('');
+  const rs=RUNS.filter(r=>r.strategy===strat);sel=sel&&rs.includes(sel)?sel:rs[rs.length-1];
+  document.getElementById('main').innerHTML=`<h1>${strat}</h1><p class="lede">${rs[0].name} ${rs[0].symbol} · 2025-01 → 2026-03 · 每一步都是 Claude 的一個假設</p>
+  <ol class="timeline">${rs.map((r,k)=>`<li class="step" aria-current="${r===sel}"><span class="n">${k+1}</span>
+    <button data-r="${r.id}"><div class="hyp">${r.hyp}</div>
+    <div class="meta"><span>${r.at}</span><span>fast=${r.p.fast} slow=${r.p.slow}</span>
+    <span>IS <b class="${tone(r.is.ret)}">${pct(r.is.ret)}</b></span><span>OOS <b class="${tone(r.oos.ret)}">${pct(r.oos.ret)}</b></span>
+    <span>B&H OOS <b>${pct(r.bhOos.ret)}</b></span>${overfit(r)?'<span class="warn">⚠ IS ≫ OOS</span>':''}</div></button></li>
+    ${r===sel?detail(r):''}`).join('')}</ol>`;
+}
+function detail(r){return `<li class="detail">
+  <div class="kpis"><div class="kpi main"><small>OOS RETURN</small><div class="${tone(r.oos.ret)}">${pct(r.oos.ret)}</div></div>
+  <div class="kpi"><small>B&H OOS</small><div>${pct(r.bhOos.ret)}</div></div>
+  <div class="kpi"><small>MAX DRAWDOWN</small><div>${pct(Math.min(r.is.mdd,r.oos.mdd))}</div></div>
+  <div class="kpi"><small>TRADES · WIN</small><div>${r.nTrades} · ${(r.win*100).toFixed(0)}%</div></div></div>
+  ${chartSVG(r,th)}
+  <div class="tabs" role="tablist"><button role="tab" data-t="trades" aria-selected="${tab==='trades'}">交易明細</button><button role="tab" data-t="code" aria-selected="${tab==='code'}">策略原始碼</button></div>
+  ${tab==='trades'?tradesTable(r):`<pre>${esc(source(r))}</pre>`}</li>`}
+document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.s){strat=b.dataset.s;sel=null}else if(b.dataset.r){sel=RUNS.find(r=>r.id===b.dataset.r)}else if(b.dataset.t){tab=b.dataset.t}else return;render()});
+render();
+</script></body></html>
