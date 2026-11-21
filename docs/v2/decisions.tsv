@@ -8,3 +8,5 @@ ts	phase	decision	why	evidence	result
 2026-11-21T03:57:27Z	engine	指標以 TA-Lib 0.8.3 產生的 fixture 驗證，MACD 快線種子依 TA-Lib 對齊	外部權威參考值比自寫參考實作可信；MACD 初版與 TA-Lib 差 0.118，查明為種子位置差異	tests/fixtures/gen_talib_reference.py	13 個指標案例通過
 2026-11-21T03:57:27Z	engine	植入 7 種已知錯誤驗證測試有效	證明測試能抓到錯誤而非恆過	scripts/mutation_check.sh, docs/v2/evidence/pr3/mutation-check.log	7/7 killed
 2026-11-21T03:57:27Z	review	獨立 reviewer（sonnet）審查數字邏輯：修正可負擔股數少 1 股與目標股數浮點誤差；駁回 RSI 平盤與除息日賣出兩點	RSI 平盤以 TA-Lib 實測為 50；除息日前一日收盤持有者有權領取股利，即使除息日開盤賣出	commit on v2/engine, tests test_buys_every_affordable_share / test_fractional_target_survives_float_noise	新測試舊碼紅、新碼綠
+2026-11-21T04:02:15Z	data	價格用 yfinance auto_adjust=False（僅還原分割），現金股利於除息日入帳	還原權值價會讓手續費以非實際成交價計算；原始價加股利入帳可同時保持費用正確與除息不計為虧損	docs/v2/evidence/pr4/real-data-run.log	2330.TW 三年 12 次除息，不變式全數成立
+2026-11-21T04:02:15Z	data	快取只保存結束日早於台北今日的區間	包含今日的資料可能尚未收盤或被修訂，快取會造成無法察覺的錯誤	tests/test_data.py test_ranges_touching_today_are_not_cached	tests green
