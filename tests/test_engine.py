@@ -227,3 +227,24 @@ def test_fractional_target_survives_float_noise():
     bars = make_bars([1] * 4, [1] * 4)
     led = simulate(bars, lambda _h, _p: 0.29, NO_FEES, 100, initial_target=0.29)
     assert led.fills[0].shares == 29
+
+
+def test_overfit_flag_compares_annualized_returns():
+    from trader.profit import annualize
+
+    # 2330.TW run: +63.64% over ~2 years in sample, +48.10% over ~10 months out of sample.
+    is_ann = annualize(0.6364, "2023-01-03", "2025-02-14")
+    oos_ann = annualize(0.4810, "2025-02-14", "2025-12-31")
+    assert is_ann < oos_ann, "better annualized out of sample is not overfitting"
+    assert annualize(0.21, "2024-01-01", "2025-01-01") == pytest.approx(0.21, abs=1e-3)
+    assert annualize(0.1, "2025-01-01", "2025-01-01") is None
+
+
+def test_overfit_flag_fires_when_out_of_sample_collapses():
+    n = 300
+    s = int(0.7 * n)
+    closes = [100 * 1.002**t for t in range(s)] + [100 * 1.002 ** (s - 1)] * (n - s)
+    bars = make_bars(closes, closes)
+    r = report(simulate(bars, lambda _h, _p: 1.0, NO_FEES, 1e6), buy_and_hold(bars, NO_FEES, 1e6))
+    assert r.out_of_sample.ret == pytest.approx(0, abs=0.01) and r.in_sample.ret > 0.3
+    assert r.overfit

@@ -37,7 +37,7 @@ v1 的做法是由後端呼叫 LLM endpoint，在每個觸發事件上請模型�
 | Q9 | 策略執行 | 每次回測開一個 subprocess，設 timeout；不另做安全沙箱 |
 | Q10 | MCP tools | `search_stock`、`get_ohlcv`、`run_backtest`、`get_run`、`list_runs`；指標以 Python 函式庫 `trader.ta` 提供 |
 | Q11 | 發佈 | Python 套件，以 `uvx` 執行；檢視器以靜態檔案打包，使用者不需安裝 Node |
-| Q12 | 防止過擬合 | 預設依 70/30 切分樣本內（IS）與樣本外（OOS），一律附 buy & hold 基準 |
+| Q12 | 防止過擬合 | 預設依 70/30 切分樣本內（IS）與樣本外（OOS），一律附 buy & hold 基準；過擬合警示比較年化報酬率（實作時修訂，見 decisions.tsv） |
 | Q13 | Skill | 以 Claude Code plugin 發佈（skill + MCP 設定） |
 | Q14 | `hypothesis` | `run_backtest` 必填，說明本次驗證的假設 |
 | Q15 | 檢視器頁面 | run 列表與 run 詳情；不使用 SSE；不做多 run 對比頁 |
@@ -125,7 +125,8 @@ def on_bar(hist, pos, p):
 | 交易次數 | 已平倉的完整來回次數 |
 | 勝率 | 已實現損益 > 0 的平倉次數 ÷ 交易次數；交易次數為 0 時顯示「—」 |
 | Buy & hold | 第 0 日開盤以相同本金與費用規則買進並持有至最後一日，依相同區間計算 |
-| 過擬合警示 ⚑ | IS 報酬率 − OOS 報酬率 > 15 個百分點 |
+| 年化報酬率 | (1 + 區間報酬率)^(365.25 ÷ 區間日曆天數) − 1，分別計算 IS 與 OOS |
+| 過擬合警示 ⚑ | IS 年化報酬率 − OOS 年化報酬率 > 15 個百分點（IS 期間較長，直接比較總報酬率會誤判在樣本外表現更佳的策略） |
 
 IS 與 OOS 屬於同一次連續回測，部位會跨越切分點延續，並非兩次獨立回測。報酬率以初始本金為基準，因此 (1 + IS) × (1 + OOS) = 1 + 總報酬率恆成立，且 buy & hold 第 0 日的買進手續費會反映在報酬率中。回測至少需要 3 根 K 棒。
 
