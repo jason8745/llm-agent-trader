@@ -26,7 +26,7 @@
 
 1. 安裝並登入 [Claude Desktop](https://claude.ai/download)。
 2. 到 [Releases 頁面](https://github.com/jason8745/llm-agent-trader/releases/latest)，下載最新的 `llm-agent-trader-x.y.z.mcpb`。
-3. 點兩下下載的檔案，或把它拖進 Claude Desktop 視窗，在跳出的視窗按「安裝」。「研究資料夾」維持預設即可。
+3. 點兩下下載的檔案，或把它拖進 Claude Desktop 視窗，在跳出的視窗按「安裝」。
 4. 開一個新對話，輸入：
 
    ```
@@ -93,7 +93,7 @@ dashboard 會跟著 Claude 的回測自動更新，不需要重新整理。之�
 - `strategies/`：策略檔。
 - `.trader/runs.db`：回測紀錄與結論。
 
-刪除這個資料夾就會刪除所有研究。要改放其他位置：Claude Desktop 在擴充功能設定中修改「研究資料夾」；Claude Code 設定環境變數 `TRADER_WORKSPACE`。
+刪除這個資料夾就會刪除所有研究。Claude Code 使用者可以用環境變數 `TRADER_WORKSPACE` 改放其他位置。
 
 ## 常見問題
 

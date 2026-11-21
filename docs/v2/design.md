@@ -261,7 +261,7 @@ def on_bar(hist, pos, p):
 - **對象**：包含不會使用終端機的使用者，因此同時支援 Claude Desktop 與 Claude Code。
 - **Claude Desktop**：以 `.mcpb` 擴充套件安裝（`scripts/build_mcpb.py`），`server.type` 為 `uv`。Claude Desktop 會自行下載 uv，uv 再下載 Python 與依賴套件，使用者不需安裝任何軟體。
 - **Claude Code**：維持 plugin 安裝。
-- **研究資料夾**：只有一個，預設為 `~/Documents/trader-research`（`TRADER_WORKSPACE` 可覆寫），不再依啟動位置判斷。資料夾只能由 `setup_workspace` 在使用者同意後建立；尚未建立時，其他工具一律回覆請先徵求同意，命令列也不會自行建立。
+- **研究資料夾**：只有一個，固定為 `~/Documents/trader-research`（`TRADER_WORKSPACE` 可覆寫，僅供 Claude Code 與測試；擴充套件不提供設定欄位，因為 Claude Desktop 的設定視窗不會展開 `${DOCUMENTS}` 且 Save 無法按下），不再依啟動位置判斷。資料夾只能由 `setup_workspace` 在使用者同意後建立；尚未建立時，其他工具一律回覆請先徵求同意，命令列也不會自行建立。
 - **策略檔**：由 `save_strategy` 寫入並先做靜態檢查，因為 Claude Desktop 的對話沒有寫檔工具。
 - **研究規則**：只有一份，即 `src/trader/guide.md`，由 `get_research_guide` 提供；skill 只負責指向它。
 - **launcher**：直接回應 `get_research_guide` 與 `setup_workspace`（`trader/workspace.py` 只使用標準函式庫），使第一輪對話不必等待依賴套件安裝。launcher 以 `UV` 環境變數取得的同一個 uv 啟動真正的 server，並只使用 uv 管理的 Python，避免觸發 macOS 內建 Python 的開發者工具安裝提示。

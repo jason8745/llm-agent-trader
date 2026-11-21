@@ -72,8 +72,9 @@ def test_desktop_extension_bundle(tmp_path, monkeypatch):
     assert not any(n.startswith(("tests/", "docs/")) or "__pycache__" in n for n in names)
     assert m["manifest_version"] == "0.4" and m["server"]["type"] == "uv"
     assert "--managed-python" in m["server"]["mcp_config"]["args"]
-    assert m["server"]["mcp_config"]["env"]["TRADER_WORKSPACE"] == "${user_config.workspace}"
-    assert m["user_config"]["workspace"]["default"] == "${DOCUMENTS}/trader-research"
+    # No settings dialog at install time: Claude Desktop shows defaults like ${DOCUMENTS}
+    # unexpanded and keeps Save disabled, so the server's own default folder is used instead.
+    assert "user_config" not in m and "env" not in m["server"]["mcp_config"]
     assert {t["name"] for t in m["tools"]} >= {
         "get_research_guide",
         "setup_workspace",

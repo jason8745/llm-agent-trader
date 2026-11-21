@@ -51,17 +51,7 @@ def manifest(version: str) -> dict:
                     "3.12",
                     "${__dirname}/src/trader/mcp_launcher.py",
                 ],
-                "env": {"TRADER_WORKSPACE": "${user_config.workspace}"},
             },
-        },
-        "user_config": {
-            "workspace": {
-                "type": "string",
-                "title": "研究資料夾",
-                "description": "存放策略檔與回測紀錄的資料夾；第一次使用時，Claude 會徵求同意後才建立。",
-                "required": True,
-                "default": "${DOCUMENTS}/trader-research",
-            }
         },
         "tools": [
             {"name": t["name"], "description": t["description"].split("\n")[0]} for t in tools
