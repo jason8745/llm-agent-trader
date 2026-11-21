@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Trader v2</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper: #f5f5f5; --color-ink: #2d3142; --color-muted: #4f5d75; --color-soft: #7a8399;
+      --color-accent: #eb6c36; --rule: rgba(45,49,66,0.12);
+      --font-sans: 'Geist', system-ui, sans-serif; --font-serif: 'Instrument Serif', serif; --font-mono: 'Geist Mono', ui-monospace, monospace;
+    }
+    body { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink); padding: 3rem 2rem; }
+    .frame { max-width: 1100px; margin: 0 auto; }
+    .eyebrow { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: var(--font-serif); font-size: 2rem; font-weight: 400; letter-spacing: -0.02em; margin-bottom: 0.5rem; }
+    .sub { color: var(--color-muted); margin-bottom: 1.5rem; }
+    .scroll { overflow-x: auto; }
+    svg { width: 100%; min-width: 900px; display: block; }
+    .cards { display: grid; grid-template-columns: 1.1fr 1fr 0.9fr; gap: 1rem; margin-top: 2rem; }
+    .card { background: #fff; border: 1px solid var(--rule); border-radius: 6px; padding: 1.25rem; }
+    .card h3 { font-size: 0.95rem; margin: 0.25rem 0 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+    .card ul { padding-left: 1rem; color: var(--color-muted); font-size: 0.88rem; line-height: 1.6; }
+    code { font-family: var(--font-mono); font-size: 0.8em; }
+    footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--rule); font-family: var(--font-mono); font-size: 0.7rem; color: var(--color-soft); }
+    @media (max-width: 760px) { .cards { grid-template-columns: 1fr; } body { padding: 2rem 16px; } }
+  </style>
+</head>
+<body>
+<div class="frame">
+  <p class="eyebrow">Architecture · llm-agent-trader v2</p>
+  <h1>Claude Code 是大腦，v2 是手</h1>
+  <p class="sub">v2 是一套 code harness：台股資料、MCP tools、回測引擎、損益模組串在一起。Claude 寫的策略直接跑在上面，回測迴圈裡沒有 LLM。</p>
+
+  <div class="scroll">
+  <svg viewBox="0 0 1000 680" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="arch-v2-title arch-v2-desc">
+    <title id="arch-v2-title">llm-agent-trader v2 architecture</title>
+    <desc id="arch-v2-desc">The user discusses strategy with Claude Code, which writes Python strategy files and calls the trader MCP server; the server spawns a deterministic backtest runner that reads the strategy, fetches yfinance data, and stores runs in SQLite for a read-only web viewer.</desc>
+    <defs>
+      <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+      <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+      <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+    </defs>
+    <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+    <!-- Zones -->
+    <rect x="224" y="108" width="232" height="292" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+    <rect x="276" y="112" width="128" height="12" rx="2" fill="#f5f5f5"/>
+    <text x="340" y="121" fill="rgba(45,49,66,0.40)" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">YOUR WORKSPACE</text>
+
+    <rect x="496" y="108" width="464" height="452" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+    <rect x="612" y="112" width="232" height="12" rx="2" fill="#f5f5f5"/>
+    <text x="728" y="121" fill="rgba(45,49,66,0.40)" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">HARNESS · LLM-AGENT-TRADER (UVX)</text>
+
+    <!-- Arrows (before nodes) -->
+    <!-- 1 user -> claude -->
+    <line x1="184" y1="176" x2="244" y2="176" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <rect x="192" y="156" width="48" height="12" rx="2" fill="#f5f5f5"/>
+    <text x="216" y="165" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">DISCUSS</text>
+
+    <!-- 2 claude -> strategies -->
+    <line x1="340" y1="212" x2="340" y2="300" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <rect x="348" y="252" width="60" height="12" rx="2" fill="#f5f5f5"/>
+    <text x="352" y="261" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">WRITE .py</text>
+
+    <!-- 3 claude -> mcp (focal) -->
+    <line x1="432" y1="176" x2="516" y2="176" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+    <rect x="444" y="156" width="64" height="12" rx="2" fill="#f5f5f5"/>
+    <text x="476" y="165" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">MCP · STDIO</text>
+
+    <!-- 4 mcp -> runner -->
+    <line x1="612" y1="212" x2="612" y2="300" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <rect x="620" y="252" width="40" height="12" rx="2" fill="#f5f5f5"/>
+    <text x="624" y="261" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">SPAWN</text>
+
+    <!-- 5 runner -> strategies -->
+    <line x1="520" y1="340" x2="436" y2="340" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <rect x="454" y="320" width="44" height="12" rx="2" fill="#f5f5f5"/>
+    <text x="476" y="329" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">IMPORT</text>
+
+    <!-- 6 runner -> yfinance -->
+    <path d="M612,376 V488 Q612,496 604,496 H436" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+    <rect x="620" y="424" width="40" height="12" rx="2" fill="#f5f5f5"/>
+    <text x="624" y="433" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">OHLCV</text>
+
+    <!-- 7 runner -> runs.db -->
+    <line x1="704" y1="340" x2="748" y2="340" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <rect x="712" y="320" width="32" height="12" rx="2" fill="#f5f5f5"/>
+    <text x="728" y="329" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">SAVE</text>
+
+    <!-- 8 mcp -> runs.db -->
+    <path d="M704,176 H836 Q844,176 844,184 V300" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <rect x="748" y="156" width="40" height="12" rx="2" fill="#f5f5f5"/>
+    <text x="768" y="165" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">QUERY</text>
+
+    <!-- 9 viewer -> runs.db -->
+    <line x1="844" y1="460" x2="844" y2="380" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <rect x="852" y="412" width="36" height="12" rx="2" fill="#f5f5f5"/>
+    <text x="856" y="421" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">READ</text>
+
+    <!-- 10 user -> viewer -->
+    <path d="M112,212 V580 Q112,588 120,588 H836 Q844,588 844,580 V536" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+    <rect x="428" y="568" width="104" height="12" rx="2" fill="#f5f5f5"/>
+    <text x="480" y="577" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">BROWSE /runs/:id</text>
+
+    <!-- Nodes -->
+    <!-- User -->
+    <rect x="40" y="140" width="144" height="72" rx="6" fill="#f5f5f5"/>
+    <rect x="40" y="140" width="144" height="72" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+    <rect x="48" y="148" width="32" height="12" rx="2" fill="none" stroke="rgba(122,131,153,0.5)" stroke-width="0.8"/>
+    <text x="64" y="157" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">USER</text>
+    <text x="112" y="184" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">You</text>
+    <text x="112" y="200" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">terminal + browser</text>
+
+    <!-- Claude Code -->
+    <rect x="248" y="140" width="184" height="72" rx="6" fill="#f5f5f5"/>
+    <rect x="248" y="140" width="184" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+    <rect x="256" y="148" width="40" height="12" rx="2" fill="none" stroke="rgba(45,49,66,0.4)" stroke-width="0.8"/>
+    <text x="276" y="157" fill="rgba(45,49,66,0.8)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AGENT</text>
+    <text x="340" y="184" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Claude Code</text>
+    <text x="340" y="200" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">+ trader plugin skill</text>
+
+    <!-- strategies -->
+    <rect x="248" y="304" width="184" height="72" rx="6" fill="#f5f5f5"/>
+    <rect x="248" y="304" width="184" height="72" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+    <rect x="256" y="312" width="40" height="12" rx="2" fill="none" stroke="rgba(79,93,117,0.4)" stroke-width="0.8"/>
+    <text x="276" y="321" fill="rgba(79,93,117,0.8)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">FILES</text>
+    <text x="340" y="348" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">strategies/*.py</text>
+    <text x="340" y="364" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">on_bar(hist, pos, p)</text>
+
+    <!-- MCP server (focal) -->
+    <rect x="520" y="140" width="184" height="72" rx="6" fill="#f5f5f5"/>
+    <rect x="520" y="140" width="184" height="72" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+    <rect x="528" y="148" width="28" height="12" rx="2" fill="none" stroke="rgba(235,108,54,0.4)" stroke-width="0.8"/>
+    <text x="542" y="157" fill="rgba(235,108,54,0.9)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">MCP</text>
+    <text x="612" y="176" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">MCP server</text>
+    <text x="612" y="192" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">search_stock · get_ohlcv</text>
+    <text x="612" y="204" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">run_backtest · get_run · list_runs</text>
+
+    <!-- Runner -->
+    <rect x="520" y="304" width="184" height="72" rx="6" fill="#f5f5f5"/>
+    <rect x="520" y="304" width="184" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+    <rect x="528" y="312" width="32" height="12" rx="2" fill="none" stroke="rgba(45,49,66,0.4)" stroke-width="0.8"/>
+    <text x="544" y="321" fill="rgba(45,49,66,0.8)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">PROC</text>
+    <text x="612" y="344" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Engine + Profit</text>
+    <text x="612" y="360" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">on_bar · next-open fill</text>
+    <text x="612" y="372" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">fee+tax · IS / OOS / B&amp;H</text>
+
+    <!-- runs.db -->
+    <rect x="752" y="304" width="184" height="72" rx="6" fill="#f5f5f5"/>
+    <rect x="752" y="304" width="184" height="72" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+    <rect x="760" y="312" width="24" height="12" rx="2" fill="none" stroke="rgba(79,93,117,0.4)" stroke-width="0.8"/>
+    <text x="772" y="321" fill="rgba(79,93,117,0.8)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">DB</text>
+    <text x="844" y="348" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">runs.db</text>
+    <text x="844" y="364" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">SQLite · source snapshot</text>
+
+    <!-- Viewer -->
+    <rect x="752" y="460" width="184" height="72" rx="6" fill="#f5f5f5"/>
+    <rect x="752" y="460" width="184" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+    <rect x="760" y="468" width="24" height="12" rx="2" fill="none" stroke="rgba(45,49,66,0.4)" stroke-width="0.8"/>
+    <text x="772" y="477" fill="rgba(45,49,66,0.8)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">UI</text>
+    <text x="844" y="504" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Run viewer</text>
+    <text x="844" y="520" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">FastAPI + static Next</text>
+
+    <!-- yfinance -->
+    <rect x="248" y="460" width="184" height="72" rx="6" fill="#f5f5f5"/>
+    <rect x="248" y="460" width="184" height="72" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+    <rect x="256" y="468" width="28" height="12" rx="2" fill="none" stroke="rgba(45,49,66,0.3)" stroke-width="0.8"/>
+    <text x="270" y="477" fill="rgba(45,49,66,0.6)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EXT</text>
+    <text x="340" y="504" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">台股資料</text>
+    <text x="340" y="520" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">yfinance .TW/.TWO · 股票清單</text>
+
+    <!-- Legend -->
+    <line x1="40" y1="624" x2="960" y2="624" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+    <text x="40" y="648" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+    <rect x="120" y="640" width="16" height="12" rx="2" fill="rgba(235,108,54,0.08)" stroke="#eb6c36"/>
+    <text x="144" y="649" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">Agent entry point</text>
+    <rect x="248" y="640" width="16" height="12" rx="2" fill="#fff" stroke="#2d3142"/>
+    <text x="272" y="649" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">Process</text>
+    <rect x="336" y="640" width="16" height="12" rx="2" fill="rgba(45,49,66,0.05)" stroke="#4f5d75"/>
+    <text x="360" y="649" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">Store</text>
+    <rect x="412" y="640" width="16" height="12" rx="2" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)"/>
+    <text x="436" y="649" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">External</text>
+    <line x1="512" y1="646" x2="540" y2="646" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <text x="548" y="649" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">Internal call</text>
+    <line x1="640" y1="646" x2="668" y2="646" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+    <text x="676" y="649" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">Agent → MCP</text>
+    <line x1="764" y1="646" x2="792" y2="646" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+    <text x="800" y="649" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">Network / HTTP</text>
+  </svg>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <p class="eyebrow">Loop</p>
+      <h3><span class="dot" style="background:#eb6c36"></span>研究迴圈</h3>
+      <ul>
+        <li>討論 → 寫 <code>strategies/x.py</code> → <code>run_backtest</code>（必填 hypothesis）</li>
+        <li>只看 IS 調參；OOS 只在定稿時看一次</li>
+        <li>回傳 run_id + 檢視器連結</li>
+      </ul>
+    </div>
+    <div class="card">
+      <p class="eyebrow">Engine</p>
+      <h3><span class="dot" style="background:#2d3142"></span>確定性回測</h3>
+      <ul>
+        <li><code>hist</code> 只給到當天，結構上不可能 look-ahead</li>
+        <li>收盤出訊號，隔日開盤成交，只做多</li>
+        <li>.TW 預設手續費 0.1425% + 證交稅 0.3%</li><li><code>search_stock("台積電")</code> → 2330.TW</li>
+      </ul>
+    </div>
+    <div class="card">
+      <p class="eyebrow">Deleted from v1</p>
+      <h3><span class="dot" style="background:#7a8399"></span>拿掉的東西</h3>
+      <ul>
+        <li><code>llm_strategy.py</code>（3501 行）</li>
+        <li>LLM client / API keys、SSE 串流</li>
+        <li>daily_feedback、retrospective endpoint</li>
+      </ul>
+    </div>
+  </div>
+  <footer>llm-agent-trader · v2 design draft · 2026-11-21</footer>
+</div>
+</body>
+</html>
