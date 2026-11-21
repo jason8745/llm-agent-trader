@@ -1,0 +1,29 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "llm-agent-trader",
+  "version": "2.0.0",
+  "description": "Taiwan stock backtesting harness: discuss a strategy, let Claude write it, and backtest it on a deterministic engine with in-sample, out-of-sample, and buy-and-hold results.",
+  "author": {
+    "name": "jason8745",
+    "url": "https://github.com/jason8745"
+  },
+  "homepage": "https://github.com/jason8745/llm-agent-trader",
+  "repository": "https://github.com/jason8745/llm-agent-trader",
+  "license": "MIT",
+  "keywords": [
+    "backtesting",
+    "taiwan-stock",
+    "trading",
+    "mcp"
+  ],
+  "network": {
+    "hosts": [
+      "query1.finance.yahoo.com",
+      "query2.finance.yahoo.com",
+      "fc.yahoo.com",
+      "guce.yahoo.com",
+      "pypi.org",
+      "files.pythonhosted.org"
+    ]
+  }
+}

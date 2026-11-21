@@ -1,0 +1,15 @@
+{
+  "name": "llm-agent-trader",
+  "description": "Taiwan stock backtesting harness for Claude Code: MCP tools, a deterministic engine, and a run viewer.",
+  "owner": {
+    "name": "jason8745",
+    "url": "https://github.com/jason8745"
+  },
+  "plugins": [
+    {
+      "name": "llm-agent-trader",
+      "source": "./",
+      "description": "Taiwan stock backtesting harness for Claude Code."
+    }
+  ]
+}
