@@ -33,3 +33,9 @@ def test_price_and_shares():
     assert fmt.price(1045.0) == "1,045.00"
     assert fmt.price(0.125) == "0.13"
     assert fmt.shares(2031) == "2,031"
+
+
+def test_symbol_label_adds_the_chinese_name_when_listed():
+    assert fmt.symbol_label("2330.TW") == "2330.TW 台積電"
+    assert fmt.symbol_label("0050.TW") == "0050.TW 元大台灣50"
+    assert fmt.symbol_label("AAPL") == "AAPL"

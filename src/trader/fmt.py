@@ -3,6 +3,7 @@ all render through these functions, so a run reads identically everywhere."""
 
 from decimal import ROUND_HALF_UP, Decimal
 
+from trader.data import stock_name
 from trader.profit import Report
 
 DASH = "—"
@@ -81,6 +82,12 @@ def summary_markdown(s: dict[str, str]) -> str:
     if s["overfit"] == "yes":
         lines.append(OVERFIT_NOTE)
     return "\n".join(lines)
+
+
+def symbol_label(symbol: str) -> str:
+    """'2330.TW 台積電' for listed Taiwan symbols, the bare symbol otherwise."""
+    name = stock_name(symbol)
+    return f"{symbol} {name}" if name else symbol
 
 
 def viewer_url(run_id: int, port: int) -> str:

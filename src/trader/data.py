@@ -82,6 +82,16 @@ def stock_list() -> list[dict]:
     return json.loads(STOCKS_JSON.read_text(encoding="utf-8"))
 
 
+@cache
+def _names() -> dict[str, str]:
+    return {s["symbol"]: s["name"] for s in stock_list()}
+
+
+def stock_name(symbol: str) -> str | None:
+    """Chinese name of a listed Taiwan stock or ETF, or None for symbols outside the list."""
+    return _names().get(symbol.strip().upper())
+
+
 def search_stock(query: str, limit: int = 10) -> list[dict]:
     q = query.strip().upper().removesuffix(".TWO").removesuffix(".TW")
     if not q:
