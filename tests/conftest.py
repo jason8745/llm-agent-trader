@@ -1,14 +1,18 @@
+import datetime as dt
 import textwrap
 from pathlib import Path
 
+import pandas as pd
 import pytest
 from bars import random_bars
 
 SYMBOL = "TEST.TW"
-DEV_START, DEV_END, EXEC_START, EXEC_END = "2024-01-01", "2024-03-31", "2024-04-01", "2024-12-31"
-PERIODS = (DEV_START, DEV_END, EXEC_START, EXEC_END)
+START, END = "2024-06-03", "2024-12-31"
+PERIODS = (START, END)
 # Keyword arguments for the run_backtest tool and runner.
-BT = dict(dev_start=DEV_START, dev_end=DEV_END, exec_start=EXEC_START, exec_end=EXEC_END)
+BT = dict(start=START, end=END)
+# The runner loads WARMUP_CALENDAR_DAYS before START so the strategy has indicator history.
+LOAD_START = (dt.date.fromisoformat(START) - dt.timedelta(days=130)).isoformat()
 
 MA_CROSS = textwrap.dedent(
     '''
@@ -31,8 +35,8 @@ def ws(tmp_path, monkeypatch) -> Path:
     """A workspace with one strategy and cached bars for TEST.TW, so nothing hits the network."""
     cache = tmp_path / "cache"
     (cache / "ohlcv").mkdir(parents=True)
-    random_bars(n=120, start=DEV_START).to_csv(
-        cache / "ohlcv" / f"{SYMBOL}_{DEV_START}_{EXEC_END}.csv", index_label="date"
+    random_bars(n=len(pd.bdate_range(LOAD_START, END)), start=LOAD_START).to_csv(
+        cache / "ohlcv" / f"{SYMBOL}_{LOAD_START}_{END}.csv", index_label="date"
     )
     work = tmp_path / "work"
     (work / "strategies").mkdir(parents=True)

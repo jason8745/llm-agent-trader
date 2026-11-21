@@ -27,8 +27,8 @@ def manifest(version: str) -> dict:
         "description": "與 Claude 討論台股策略，由 Claude 撰寫並回測，結果以 dashboard 呈現。",
         "long_description": (
             "安裝後，在對話中說「開始使用台股回測」。Claude 會徵求同意後建立研究資料夾、"
-            "開啟 dashboard，並引導你完成第一個策略研究：確認研究條件、回測策略開發期間與"
-            "策略執行期間、與買進並持有比較，最後寫入發現與洞察。所有數字由確定性的回測引擎計算。"
+            "開啟 dashboard，並引導你完成第一個策略研究：確認研究條件、自動完成數次實驗、"
+            "與買進並持有比較，最後寫入發現與洞察。所有數字由確定性的回測引擎計算。"
         ),
         "author": {"name": "jason8745", "url": "https://github.com/jason8745"},
         "repository": {"type": "git", "url": "https://github.com/jason8745/llm-agent-trader"},

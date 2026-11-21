@@ -1,11 +1,11 @@
 import time
 
 import pytest
-from conftest import BT, DEV_END, DEV_START, EXEC_END, EXEC_START, PERIODS, SYMBOL
+from conftest import BT, END, LOAD_START, PERIODS, START, SYMBOL
 
 from trader import data, runner, store
 from trader.engine import buy_and_hold, fees_for, simulate
-from trader.profit import study_report
+from trader.profit import period
 from trader.ta import sma
 
 HYP = "以 5 日與 20 日均線交叉作為基準策略。"
@@ -24,73 +24,57 @@ def ma(hist, _pos):
     return 1.0 if sma(hist.close, 5).iloc[-1] > sma(hist.close, 20).iloc[-1] else 0.0
 
 
+def loaded():
+    """The bars the runner keeps: WARMUP_BARS of history before START, then the period."""
+    bars = data.load_bars(SYMBOL, LOAD_START, END)
+    k = int((bars.index.strftime("%Y-%m-%d") < START).sum())
+    assert k > runner.WARMUP_BARS  # the fixture has more history than the runner keeps
+    return bars.iloc[k - runner.WARMUP_BARS :], runner.WARMUP_BARS
+
+
 def test_run_matches_direct_engine_computation(ws):
     r = run(ws)
-    bars = data.load_bars(SYMBOL, DEV_START, EXEC_END)
-    dates = bars.index.strftime("%Y-%m-%d")
-    dev_n = int((dates <= DEV_END).sum())
-    k = int((dates < EXEC_START).sum())
-    assert dev_n == k  # no gap between the periods
+    bars, k = loaded()
     fees, cash = fees_for(SYMBOL), runner.DEFAULT_CASH
-    dev = simulate(bars.iloc[:dev_n], ma, fees, cash)
-    exe = simulate(bars, ma, fees, cash, start=k)
-    bh_dev = buy_and_hold(bars.iloc[:dev_n], fees, cash)
-    expected = study_report(dev, bh_dev, exe, buy_and_hold(bars, fees, cash, start=k))
-    assert r.report == expected
-    assert r.payload["dev"]["equity"] == dev.equity
-    assert r.payload["exec"]["equity"] == exe.equity
+    led = simulate(bars, ma, fees, cash, start=k)
+    assert r.report == period(led, buy_and_hold(bars, fees, cash, start=k))
+    assert r.payload["ledger"]["equity"] == led.equity
     assert r.params == {"fast": 5, "slow": 20}
     assert r.strategy == "ma_cross" and r.symbol == SYMBOL and r.hypothesis == HYP
-    assert (r.dev_start, r.dev_end, r.exec_start, r.exec_end) == PERIODS
-    assert len(r.payload["bars"]["date"]) == len(bars)
-    assert r.regimes[0].start == DEV_START and r.regimes[-1].end == dates[-1]
+    assert (r.start, r.end) == PERIODS
+    assert r.payload["bars"]["date"] == list(bars.index.strftime("%Y-%m-%d"))
+    assert r.regimes[0].start == led.dates[0] and r.regimes[-1].end == led.dates[-1]
+    assert sum(g.bars for g in r.regimes) == len(led.dates) - 1  # regimes tile the period only
 
 
-def test_execution_starts_flat_at_exec_start_with_warm_up_history(ws):
+def test_backtest_starts_flat_at_start_after_warm_up_bars(ws):
     r = run(ws, write(ws, "hold", "def on_bar(hist, pos, p):\n    return 1.0\n"))
-    exe, bars = r.payload["exec"], r.payload["bars"]
-    k = bars["date"].index(exe["dates"][0])
-    assert exe["dates"][0] >= EXEC_START and bars["date"][k - 1] < EXEC_START
-    # The decision made on warm-up history before exec_start fills at exec_start's open.
-    first = exe["fills"][0]
+    led, bars = r.payload["ledger"], r.payload["bars"]
+    k = bars["date"].index(led["dates"][0])
+    assert k == runner.WARMUP_BARS
+    assert led["dates"][0] >= START and bars["date"][k - 1] < START
+    # The decision made on warm-up history before the start fills at the first bar's open.
+    first = led["fills"][0]
     assert (first["date"], first["side"], first["price"]) == (
         bars["date"][k],
         "BUY",
         bars["open"][k],
     )
-    assert exe["initial_cash"] == runner.DEFAULT_CASH
-    assert exe["equity"] == r.payload["bh_exec"]  # holding from the first bar is buy-and-hold
-    assert r.payload["dev"]["dates"][-1] <= DEV_END  # development never sees later bars
+    assert led["initial_cash"] == runner.DEFAULT_CASH
+    assert led["equity"] == r.payload["bh"]  # holding from the first bar is buy-and-hold
 
 
-def test_strategy_sees_earlier_bars_in_execution(ws):
-    # 65 development bars; the last bar of a ledger makes no decision, so development never
-    # sees 65 bars of history while execution does on its first decision.
-    r = run(ws, write(ws, "late", "def on_bar(hist, pos, p):\n    return float(len(hist) >= 65)\n"))
-    assert not r.payload["dev"]["fills"]
-    assert r.payload["exec"]["fills"][0]["bar"] == 0
-
-
-def test_gap_bars_are_history_for_execution_only(ws):
-    r = run(ws, periods=(DEV_START, DEV_END, "2024-04-15", EXEC_END))
-    dates, dev, exe = r.payload["bars"]["date"], r.payload["dev"], r.payload["exec"]
-    gap = [d for d in dates if DEV_END < d < "2024-04-15"]
-    assert gap
-    assert len(dev["dates"]) + len(gap) + len(exe["dates"]) == len(dates)
-    assert exe["dates"][0] == dates[len(dev["dates"]) + len(gap)]
-    assert sum(g.bars for g in r.regimes) == len(dates) - 1  # regimes tile every loaded bar
+def test_strategy_sees_warm_up_history_on_its_first_decision(ws):
+    body = f"def on_bar(hist, pos, p):\n    return float(len(hist) >= {runner.WARMUP_BARS})\n"
+    assert run(ws, write(ws, "late", body)).payload["ledger"]["fills"][0]["bar"] == 0
 
 
 @pytest.mark.parametrize(
     "periods,message",
     [
-        (("2024/01/01", DEV_END, EXEC_START, EXEC_END), "策略開發期間起日須為 YYYY-MM-DD"),
-        ((DEV_START, DEV_END, EXEC_START, "2024-13-01"), "策略執行期間迄日須為 YYYY-MM-DD"),
-        (("2024-03-31", "2024-01-01", EXEC_START, EXEC_END), "策略開發期間起日 2024-03-31 晚於"),
-        ((DEV_START, DEV_END, "2024-12-31", "2024-05-01"), "策略執行期間起日 2024-12-31 晚於"),
-        ((DEV_START, DEV_END, DEV_END, EXEC_END), "須晚於策略開發期間迄日"),
-        ((DEV_START, DEV_START, EXEC_START, EXEC_END), "策略開發期間僅有 1 個交易日"),
-        ((DEV_START, DEV_END, "2024-11-01", EXEC_END), "策略執行期間僅有 0 個交易日"),
+        (("2024/06/03", END), "回測期間起日須為 YYYY-MM-DD"),
+        ((START, "2024-13-01"), "回測期間迄日須為 YYYY-MM-DD"),
+        (("2024-12-31", "2024-06-03"), "回測期間起日 2024-12-31 晚於"),
     ],
 )
 def test_period_validation(ws, periods, message):
@@ -98,11 +82,19 @@ def test_period_validation(ws, periods, message):
         run(ws, periods=periods)
 
 
+@pytest.mark.parametrize("periods,n", [((END, END), 1), (("2025-03-01", "2025-03-31"), 0)])
+def test_period_needs_two_trading_days(ws, monkeypatch, periods, n):
+    bars = data.load_bars(SYMBOL, LOAD_START, END)
+    monkeypatch.setattr(runner.data, "load_bars", lambda *_: bars)
+    with pytest.raises(runner.RunError, match=f"回測期間僅有 {n} 個交易日"):
+        run(ws, periods=periods)
+
+
 def test_reruns_are_bit_identical_and_fingerprinted(ws):
     a, b = run(ws), run(ws)
     assert a.id != b.id and (a.n, b.n) == (1, 2) and a.study_key == b.study_key
     assert a.payload == b.payload
-    assert a.data_sha == b.data_sha == data.fingerprint(data.load_bars(SYMBOL, DEV_START, EXEC_END))
+    assert a.data_sha == b.data_sha == data.fingerprint(loaded()[0])
     assert a.source_sha == b.source_sha
 
 
@@ -130,7 +122,7 @@ def test_param_overrides(ws):
 
 def test_fee_override(ws):
     r = run(ws, fee={"commission_rate": 0.0, "min_commission": 0})
-    fills = r.payload["dev"]["fills"] + r.payload["exec"]["fills"]
+    fills = r.payload["ledger"]["fills"]
     assert fills and all(f["commission"] == 0 for f in fills)
     with pytest.raises(runner.RunError, match="不支援的費用欄位"):
         run(ws, fee={"rate": 0})
@@ -164,12 +156,12 @@ def test_infinite_loop_times_out_and_next_run_works(ws):
     with pytest.raises(runner.RunError, match="未在 2 秒內完成"):
         run(ws, name, timeout=2)
     assert time.monotonic() - t0 < 10
-    assert run(ws).report.exec.trades.count >= 0
+    assert run(ws).report.trades.count >= 0
 
 
 def test_strategy_stdout_does_not_corrupt_results(ws):
     name = write(ws, "chatty", "def on_bar(hist, pos, p):\n    print('hello')\n    return 1.0\n")
-    assert run(ws, name).payload["exec"]["fills"]
+    assert run(ws, name).payload["ledger"]["fills"]
 
 
 def test_list_runs_filters(ws):

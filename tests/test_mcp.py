@@ -58,7 +58,7 @@ def test_mcp_tools_over_stdio(ws):
     port = int(re.search(r"127\.0\.0\.1:(\d+)/runs/", result).group(1))
     assert result == fmt.run_text(run, port)
     assert detail.startswith(fmt.run_detail(run, port)) and run.source in detail
-    assert "成交明細" in detail and "最深回撤（策略執行期間）" in detail
+    assert "成交明細" in detail and "最深回撤" in detail and "盤勢彙總" in result
     assert HYP in listing and f"研究 {run.study_key}" in listing
     for text in (result, detail, listing, mcp_server.INSTRUCTIONS):
         assert "樣本內" not in text and "樣本外" not in text
@@ -110,21 +110,21 @@ def first_study(ws):
 def test_finalize_accepts_numbers_quoted_from_the_study(ws):
     a, b = first_study(ws)
     ra, rb = a.report, b.report
-    dev_ret = fmt.pct(ra.dev.strategy.ret)  # from the first iteration's output
-    exec_mdd = fmt.pct(rb.exec.strategy.mdd)
-    trips = fmt.shares(rb.exec.trades.count)
+    ret = fmt.pct(ra.strategy.ret)  # from the first iteration's output
+    mdd = fmt.pct(rb.strategy.mdd)
+    trips = fmt.shares(rb.trades.count)
     verdict = "本策略僅適用於重視風險控制的情境。"
     findings = [
         {
-            "finding": f"策略開發期間報酬率為 {dev_ret}。",
-            "insight": "開發期間的表現是調整參數的唯一依據。",
+            "finding": f"第一次實驗的報酬率為 {ret}。",
+            "insight": "此結果作為後續調整參數的基準。",
         },
         {
-            "finding": f"策略執行期間最大回撤為 {exec_mdd}。",
-            "insight": "執行期間的風險須與買進並持有基準比較。",
+            "finding": f"最大回撤為 {mdd}。",
+            "insight": "回撤須與買進並持有基準比較。",
         },
         {
-            "finding": f"策略執行期間交易次數 {trips} 次。",
+            "finding": f"交易次數為 {trips} 次。",
             "insight": "本研究以 2025 年以前的資料為準，交易次數少時統計可信度有限。",
         },
     ]
@@ -139,7 +139,7 @@ def test_finalize_accepts_numbers_quoted_from_the_study(ws):
 
 def test_finalize_rejects_invented_numbers_and_stores_nothing(ws):
     a, _ = first_study(ws)
-    real = fmt.pct(a.report.dev.strategy.ret)
+    real = fmt.pct(a.report.strategy.ret)
     ok = {"finding": f"報酬率為 {real}。", "insight": "依工具輸出引用。"}
     bad = {"finding": "年化約 +31.07%。", "insight": "期末權益 1,234,567。"}
     out = mcp_server.finalize(ws, a.id, "總結。", [ok, bad, ok], 8765)

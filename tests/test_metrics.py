@@ -7,14 +7,14 @@ from bars import random_bars
 from trader.engine import NO_FEES, TW_STOCK_FEES, Ledger, RoundTrip, buy_and_hold, simulate
 from trader.profit import (
     Drawdown,
-    chained_returns,
+    RegimeRow,
     daily_returns,
     drawdown_curve,
     drawdowns,
     metrics,
     period,
+    regime_summary,
     regime_table,
-    study_report,
     trades,
 )
 from trader.regime import Regime
@@ -154,17 +154,6 @@ def year(ret):
     )
 
 
-def test_overfit():
-    _, dev = year(0.30)
-    _, good = year(0.20)  # annualized gap ~0.10
-    _, bad = year(0.10)  # gap ~0.20
-    single, _ = year(0.10)  # annualized None
-    assert not study_report(dev, dev, good, good).overfit
-    assert study_report(dev, dev, bad, bad).overfit
-    assert not study_report(dev, dev, single, single).overfit
-    assert study_report(dev, dev, bad, bad).exec.strategy.ret == pytest.approx(0.10)
-
-
 @pytest.mark.parametrize("seed", [1, 2, 3])
 def test_metrics_invariants(seed):
     bars = random_bars(seed=seed)
@@ -200,12 +189,15 @@ def test_drawdown_curve_starts_at_initial_cash():
     assert drawdown_curve(100, [90, 110, 99, 120]) == pytest.approx([-0.1, 0, -0.1, 0])
 
 
-def test_chained_returns_keep_each_period_return_exact():
-    cash = 1000.0
-    dev = [1000.0, 1100.0, 1200.0]  # development return +20%
-    exe = [900.0, 1080.0]  # execution restarts at 1000; return +8%
-    out = chained_returns(cash, dev, exe)
-    # dev: e/1000 - 1; exec: 1.2 * e/1000 - 1
-    assert out == pytest.approx([0.0, 0.1, 0.2, 0.08, 0.296])
-    # inside the execution period the move from its start equals the execution return
-    assert (1 + out[-1]) / (1 + out[2]) - 1 == pytest.approx(exe[-1] / cash - 1)
+def test_regime_summary_compounds_segments_of_each_kind():
+    rows = [
+        RegimeRow("d0", "d2", "up", 2, 0.10, 0.05, 1.0),
+        RegimeRow("d2", "d5", "down", 3, -0.20, -0.02, 0.0),
+        RegimeRow("d5", "d9", "up", 4, 0.20, 0.10, 0.5),
+    ]
+    up, down = regime_summary(rows)  # no range segment, so no range row; up comes first
+    assert (up.kind, up.segments, up.bars) == ("up", 2, 6)
+    assert up.price_change == pytest.approx(1.1 * 1.2 - 1)  # compounded, not the sum 0.30
+    assert up.strategy == pytest.approx(1.05 * 1.1 - 1)
+    assert up.exposure == pytest.approx((1.0 * 2 + 0.5 * 4) / 6)  # weighted by trading days
+    assert (down.kind, down.segments, down.bars, down.exposure) == ("down", 1, 3, 0.0)
