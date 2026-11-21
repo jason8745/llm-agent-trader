@@ -58,6 +58,7 @@ def parse(rows: list[list[str]], market: str, suffix: str) -> list[dict]:
         if kind is None or len(row) < 5 or "　" not in row[0]:
             continue
         code, name = (part.strip() for part in row[0].split("　", 1))
+        name = name.replace("*", "")  # exchange footnote marker, not part of the name
         out.append(
             {
                 "symbol": f"{code}.{suffix}",
