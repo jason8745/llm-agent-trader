@@ -28,3 +28,9 @@ ts	phase	decision	why	evidence	result
 2026-11-21T06:41:32Z	viewer	檢視器每 2 秒輪詢 /api/runs，有新回測時自動更新；使用者停留在最新一筆時跟隨切換，選了較舊的回測則只更新列表	使用者希望 dashboard 隨 Claude 內的互動自動變化；跟隨最新但不打斷使用者的選擇	docs/v2/evidence/pr16/live.log	新回測 1.8 秒內出現
 2026-11-21T06:52:23Z	plugin	plugin 的 MCP 設定移入 .claude-plugin/plugin.json 的 mcpServers，刪除根目錄 .mcp.json	根目錄 .mcp.json 會被 Claude Code 當成此 repo 的專案 MCP 設定；在 repo 內開 Claude Code 會出現待核准的 trader 與 CLAUDE_PLUGIN_ROOT 缺漏警告	docs/v2/evidence/pr17	plugin 照常連線，repo 內不再出現專案設定
 2026-11-21T06:59:20Z	onboarding	新增 start skill 與 open_dashboard 工具；版本 2.2.0	使用者指出安裝後的引導若只靠對話很難重現，應由 skill 支援；dashboard 需能在 Claude 內直接開啟，而非僅能點回測回覆中的連結	skills/start/SKILL.md；tests/test_viewer.py；docs/v2/evidence/pr18	見 PR #18
+2026-11-21T08:13:18Z	periods	取消固定 70/30，改為使用者確認的策略開發期間與策略執行期間；執行期間以初始資金空手開始，指標可用之前的資料暖機	使用者要求以「回測期間／策略執行期間」取代樣本內外，避免把樣本內當成實際執行結果；並列兩段即可感受過度擬合	PR #19、PR #20；docs/v2/evidence/pr19/crosscheck.log	pandas 獨立重算差異 0
+2026-11-21T08:13:18Z	grill	研究的第一次回測前，Claude 以編號題目一次確認標的、策略、兩段期間、資金與費用；run_backtest 必須明確傳入兩段期間	使用者要求回測融入 grill-me 體驗；程式無法驗證使用者是否確認，故流程寫入 skill、期間由工具強制	docs/v2/evidence/pr20/claude-session-turn1.md	第一輪只查代號並提出五題
+2026-11-21T08:13:18Z	regimes	盤勢分段採方案 B：12% 區間達 60 日為盤整段，其餘以 10% 反轉、15% 分類的波段法	趨勢法標籤與實際漲跌相反；純波段法抓不到長期橫盤；使用者看雛型後選定	docs/v2/mockups/v3；PR #19 測試	與雛型 9 段一致
+2026-11-21T08:13:18Z	conclusion	finalize_study 改為結構化：一句總結加 3 至 6 組發現與洞察，寫入前驗證每個數字；skill 禁止以文字表達推算數量	使用者指出結論只有敘述沒有 insight；以結構強制每則發現都有洞察	tests/test_mcp.py；docs/v2/evidence/pr20/claude-session-turn2.md	第一次送出即通過驗證
+2026-11-21T08:13:18Z	dashboard	採看盤桌版面並加入版本一的重點區；累積報酬率將執行期間接續於開發期間終點繪製；回撤合併為一條並淡化開發期間	使用者選版本二、要求更友善並指出損益與回撤的斷層體感不佳；串接後執行期間內的漲跌幅恰等於執行期間報酬率	docs/v2/mockups/v3/b2-desk.png；docs/v2/evidence/pr20	即時更新四種情況通過
+2026-11-21T08:13:18Z	version	版本號維持 2.x，本次為 2.3.0	使用者指示版本維持 2.x.x	pyproject.toml、plugin.json	2.3.0

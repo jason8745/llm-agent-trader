@@ -1,4 +1,4 @@
-"""Read-only run viewer: a stdlib HTTP server, a static page, and JSON whose display strings
+"""Read-only viewer of studies and backtests: a stdlib HTTP server, a static page, and JSON whose display strings
 all come from trader.fmt."""
 
 import json
@@ -10,6 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from trader import fmt, store
+from trader.profit import chained_returns, drawdown_curve
 
 STATIC = Path(__file__).parent
 FILES = {
@@ -30,77 +31,163 @@ def _diff(run: store.Run, prev: store.Run | None) -> str:
     ]
     if run.source_sha != prev.source_sha:
         changes.append("原始碼變更")
-    return "、".join(changes) or "參數與原始碼皆未變更"
+    return "、".join(changes) or "參數未變更"
 
 
-def _previous(runs: list[store.Run], run: store.Run) -> store.Run | None:
-    same = [
-        r for r in runs if r.strategy == run.strategy and r.symbol == run.symbol and r.id < run.id
-    ]
-    return same[-1] if same else None
+def _diffs(runs: list[store.Run]) -> dict[int, str]:
+    """Each backtest against the previous one in its study; runs are in id order."""
+    last: dict[str, store.Run] = {}
+    out = {}
+    for r in runs:
+        out[r.id] = _diff(r, last.get(r.study_key))
+        last[r.study_key] = r
+    return out
 
 
-def runs_payload(workspace: Path) -> list[dict]:
-    runs = store.list_runs(workspace)
-    return [
-        {
-            "id": r.id,
-            "created_at": r.created_at,
-            "strategy": r.strategy,
-            "symbol": r.symbol,
-            "hypothesis": r.hypothesis,
-            "s": fmt.summary(r.report, r.dates),
-        }
-        for r in runs
-    ]
+def info_payload(workspace: Path) -> dict:
+    return {"workspace": str(workspace), "legacy_runs": store.legacy_count(workspace)}
+
+
+def tree_payload(workspace: Path) -> list[dict]:
+    """Stocks, then studies, newest backtest first; backtests within a study oldest first."""
+    studies = store.list_studies(workspace)
+    by_study: dict[str, list[store.Run]] = {}
+    for r in store.list_runs(workspace):
+        by_study.setdefault(r.study_key, []).append(r)
+    stocks: dict[str, dict] = {}
+    for key, runs in sorted(by_study.items(), key=lambda kv: -kv[1][-1].id):
+        first, final = runs[0], studies[key].final_run_id
+        stock = stocks.setdefault(
+            first.symbol, {"symbol": first.symbol, "label": first.label, "studies": []}
+        )
+        stock["studies"].append(
+            {
+                "key": key,
+                "strategy": first.strategy,
+                "dev": fmt.span(first.dev_start, first.dev_end),
+                "exec": fmt.span(first.exec_start, first.exec_end),
+                "question": first.hypothesis,
+                "final_run_id": final,
+                "updated_at": runs[-1].created_at,
+                "runs": [
+                    {
+                        "id": r.id,
+                        "n": r.n,
+                        "hypothesis": r.hypothesis,
+                        "dev_ret": fmt.pct(r.report.dev.strategy.ret),
+                        "exec_ret": fmt.pct(r.report.exec.strategy.ret),
+                        "overfit": r.report.overfit,
+                        "final": r.id == final,
+                        "created_at": r.created_at,
+                    }
+                    for r in runs
+                ],
+            }
+        )
+    return list(stocks.values())
+
+
+def study_payload(workspace: Path, key: str) -> dict | None:
+    study = store.get_study(workspace, key)
+    runs = store.list_runs(workspace, study=key)
+    if study is None or not runs:
+        return None
+    diffs = _diffs(runs)
+    iterations = []
+    for r in runs:
+        rep = r.report
+        ex = rep.exec
+        iterations.append(
+            {
+                "id": r.id,
+                "n": r.n,
+                "hypothesis": r.hypothesis,
+                "params": fmt.params_text(r.params),
+                "diff": diffs[r.id],
+                "dev_ret": fmt.pct(rep.dev.strategy.ret),
+                "dev_ann": fmt.pct(rep.dev.strategy.annualized),
+                "exec_ret": fmt.pct(ex.strategy.ret),
+                "exec_ann": fmt.pct(ex.strategy.annualized),
+                "bh_exec_ret": fmt.pct(ex.bh.ret),
+                "exec_mdd": fmt.pct(ex.strategy.mdd),
+                "exec_sharpe": fmt.ratio(ex.strategy.sharpe),
+                "exec_trades": fmt.shares(ex.trades.count),
+                "overfit": rep.overfit,
+                "final": r.id == study.final_run_id,
+            }
+        )
+    return {
+        "key": key,
+        "symbol": study.symbol,
+        "label": runs[0].label,
+        "strategy": study.strategy,
+        "dev": fmt.span(study.dev_start, study.dev_end),
+        "exec": fmt.span(study.exec_start, study.exec_end),
+        "question": runs[0].hypothesis,
+        "conclusion": json.loads(study.conclusion) if study.conclusion else None,
+        "finalized_at": study.finalized_at,
+        "final_run_id": study.final_run_id,
+        "iterations": iterations,
+    }
+
+
+def _pct(values: list[float]) -> list[float]:
+    return [round(x * 100, 2) for x in values]
+
+
+def _dd(equity: list[float], cash: float) -> list[float]:
+    return [round(d * 100, 2) for d in drawdown_curve(cash, equity)]
 
 
 def run_payload(workspace: Path, run_id: int) -> dict | None:
-    runs = store.list_runs(workspace)
-    run = next((r for r in runs if r.id == run_id), None)
+    run = store.get(workspace, run_id)
     if run is None:
         return None
-    led, bars = run.payload["ledger"], run.payload["bars"]
-    side = {"BUY": "買進", "SELL": "賣出"}
+    runs = store.list_runs(workspace, study=run.study_key)
+    p, rep, cash = run.payload, run.report, run.cash
+    bars, dev, exe = p["bars"], p["dev"], p["exec"]
     return {
         "id": run.id,
-        "title": fmt.run_title(run),
-        "created_at": run.created_at,
-        "strategy": run.strategy,
+        "n": run.n,
+        "study_key": run.study_key,
         "symbol": run.symbol,
+        "label": run.label,
+        "strategy": run.strategy,
         "hypothesis": run.hypothesis,
-        "params": ", ".join(f"{k}={v}" for k, v in run.params.items()) or fmt.DASH,
-        "diff": _diff(run, _previous(runs, run)),
-        "s": fmt.summary(run.report, run.dates),
-        "overfit_note": fmt.OVERFIT_NOTE if run.report.overfit else "",
-        "split": run.report.split,
-        "bars": bars,
-        "equity": led["equity"],
-        "bh_equity": run.payload["bh_equity"],
-        "markers": [{"date": f["date"], "side": f["side"]} for f in led["fills"]],
+        "params": fmt.params_text(run.params),
+        "diff": _diffs(runs)[run.id],
+        "created_at": run.created_at,
+        "dev": fmt.span(run.dev_start, run.dev_end),
+        "exec": fmt.span(run.exec_start, run.exec_end),
+        "metrics": fmt.metric_rows(rep),
+        "trade_metrics": fmt.trade_rows(rep),
+        "overfit": rep.overfit,
+        "overfit_note": fmt.OVERFIT_NOTE if rep.overfit else None,
+        "drawdowns": {
+            "dev": fmt.drawdown_rows(rep.dev.drawdowns),
+            "exec": fmt.drawdown_rows(rep.exec.drawdowns),
+        },
+        "regimes": fmt.regime_rows(run.regimes),
+        "regime_rules": fmt.REGIME_RULES,
+        "chart": {
+            "dates": bars["date"],
+            **{c: bars[c] for c in ("open", "high", "low", "close", "volume")},
+            "dev_dates": dev["dates"],
+            "exec_dates": exe["dates"],
+            "cum": _pct(chained_returns(cash, dev["equity"], exe["equity"])),
+            "cum_bh": _pct(chained_returns(cash, p["bh_dev"], p["bh_exec"])),
+            "dd_dev": _dd(dev["equity"], cash),
+            "dd_exec": _dd(exe["equity"], cash),
+            "markers": [
+                {"date": f["date"], "side": f["side"]} for f in dev["fills"] + exe["fills"]
+            ],
+            "regimes": [{"start": g.start, "end": g.end, "kind": g.kind} for g in run.regimes],
+        },
         "fills": [
-            {
-                "date": f["date"],
-                "side": side[f["side"]],
-                "buy": f["side"] == "BUY",
-                "oos": f["bar"] >= run.report.split,
-                "price": fmt.price(f["price"]),
-                "shares": fmt.shares(f["shares"]),
-                "gross": fmt.money(f["gross"]),
-                "fees": fmt.money(f["commission"] + f["tax"]),
-            }
-            for f in led["fills"]
+            {k: f[k] for k in ("period", "date", "side", "buy", "price", "shares", "gross", "fees")}
+            for f in fmt.fill_rows(run)
         ],
-        "trips": [
-            {
-                "entry": t["entry_date"],
-                "exit": t["exit_date"],
-                "held": t["exit_bar"] - t["entry_bar"],
-                "pnl": fmt.money(t["pnl"]),
-                "win": t["pnl"] > 0,
-            }
-            for t in led["round_trips"]
-        ],
+        "trips": fmt.trip_rows(run),
         "source": run.source,
         "source_sha": run.source_sha,
         "data_sha": run.data_sha,
@@ -137,9 +224,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(403, b"forbidden host", "text/plain")
         path = self.path.split("?", 1)[0]
         if path == "/api/info":
-            return self._json({"workspace": str(self.workspace)})
-        if path == "/api/runs":
-            return self._json(runs_payload(self.workspace))
+            return self._json(info_payload(self.workspace))
+        if path == "/api/tree":
+            return self._json(tree_payload(self.workspace))
+        if m := re.fullmatch(r"/api/studies/([0-9a-f]{12})", path):
+            p = study_payload(self.workspace, m.group(1))
+            return self._json(p) if p else self._json({"error": "not found"}, 404)
         if m := re.fullmatch(r"/api/runs/(\d+)", path):
             p = run_payload(self.workspace, int(m.group(1)))
             return self._json(p) if p else self._json({"error": "not found"}, 404)
@@ -147,7 +237,7 @@ class Handler(BaseHTTPRequestHandler):
             name = m.group(1)
             if name in FILES:
                 return self._send(200, (STATIC / name).read_bytes(), FILES[name])
-        if path == "/" or re.fullmatch(r"/runs/\d+", path):
+        if path == "/" or re.fullmatch(r"/runs/\d+|/studies/[0-9a-f]{12}", path):
             return self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
         self._send(404, b"not found", "text/plain")
 

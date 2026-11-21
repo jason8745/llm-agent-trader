@@ -1,7 +1,10 @@
 """MCP tools over stdio. Every number in a tool result comes from trader.profit via trader.fmt."""
 
+import datetime as dt
+import json
 import os
 import webbrowser
+from typing import TypedDict
 
 from mcp.server import MCPServer
 
@@ -20,8 +23,12 @@ overrides. Return the target position, 0.0 to 1.0. It fills at the next day's op
 changes when the returned target changes. Indicators: `from trader import ta`
 (sma, ema, rsi, macd, bbands, atr; they compose).
 
-Every run reports in-sample (first 70%) and out-of-sample (last 30%) results next to
-buy-and-hold. Tune on in-sample only. Quote numbers exactly as the tools return them."""
+Every backtest has two explicit periods, each compared with buy-and-hold:
+策略開發期間 (development: design and tune the strategy here) and 策略執行期間 (execution:
+a simulated live run that starts flat with the initial cash; indicators may use earlier
+bars). Tune on the development period only. A study is one symbol, one strategy file and
+both periods; finalize it with finalize_study. Quote numbers exactly as the tools return
+them."""
 
 server = MCPServer("llm-agent-trader", instructions=INSTRUCTIONS)
 
@@ -62,7 +69,7 @@ def get_ohlcv(symbol: str, start: str, end: str, limit: int = 60) -> str:
         return f"錯誤：{e}"
     tail = bars.tail(max(limit, 1))
     lines = [
-        f"{symbol.upper()} · {bars.index[0].date()} 至 {bars.index[-1].date()} · 共 {len(bars)} 個交易日"
+        f"{fmt.symbol_label(symbol.strip().upper())} · {bars.index[0].date()} 至 {bars.index[-1].date()} · 共 {len(bars)} 個交易日"
         f"（顯示最後 {len(tail)} 筆）",
         "",
         "| 日期 | 開盤 | 最高 | 最低 | 收盤 | 成交量 | 現金股利 |",
@@ -81,22 +88,35 @@ def get_ohlcv(symbol: str, start: str, end: str, limit: int = 60) -> str:
 def run_backtest(
     strategy: str,
     symbol: str,
-    start: str,
-    end: str,
+    dev_start: str,
+    dev_end: str,
+    exec_start: str,
+    exec_end: str,
     hypothesis: str,
     params: dict | None = None,
     cash: float = runner.DEFAULT_CASH,
     fee: dict | None = None,
 ) -> str:
-    """Backtest a strategy file on one symbol over [start, end].
+    """Backtest a strategy file on one symbol over a development and an execution period.
 
+    Dates are YYYY-MM-DD, inclusive, with dev_start <= dev_end < exec_start <= exec_end.
     hypothesis (required): one sentence stating what this run tests, in formal written
     language. params overrides keys in the strategy's PARAMS. fee overrides the default
     fee schedule (commission_rate, min_commission, sell_tax_rate, floor_to_unit).
     """
     try:
         run = runner.run_backtest(
-            _ws(), strategy, symbol, start, end, hypothesis, params=params, cash=cash, fee=fee
+            _ws(),
+            strategy,
+            symbol,
+            dev_start,
+            dev_end,
+            exec_start,
+            exec_end,
+            hypothesis,
+            params=params,
+            cash=cash,
+            fee=fee,
         )
     except runner.RunError as e:
         return f"回測失敗：{e}"
@@ -105,34 +125,83 @@ def run_backtest(
 
 @server.tool()
 def get_run(run_id: int) -> str:
-    """Full detail of one run: summary, fills, round trips, data fingerprint, source snapshot."""
+    """Full detail of one backtest: both periods' metrics, deepest drawdowns, market regimes,
+    fills, round trips, data fingerprint and source snapshot."""
     run = store.get(_ws(), run_id)
     if run is None:
         return f"查無回測 #{run_id}。"
-    led = run.payload["ledger"]
-    return "\n\n".join(
-        [
-            fmt.run_text(run, _port()),
-            "成交明細\n" + fmt.fills_markdown(led["fills"]),
-            "已平倉交易\n" + fmt.round_trips_markdown(led["round_trips"]),
-            f"資料指紋：{run.data_sha}\n策略原始碼 sha256：{run.source_sha}",
-            f"策略原始碼（回測當下快照）\n```python\n{run.source}\n```",
-        ]
-    )
+    source = f"策略原始碼（回測當下快照）\n```python\n{run.source}\n```"
+    return fmt.run_detail(run, _port()) + "\n\n" + source
 
 
 @server.tool()
 def list_runs(strategy: str | None = None, symbol: str | None = None) -> str:
-    """All runs in this workspace, oldest first, optionally filtered."""
-    return fmt.runs_markdown(store.list_runs(_ws(), strategy, symbol))
+    """All backtests in this workspace grouped by study, oldest first, optionally filtered."""
+    ws = _ws()
+    return fmt.runs_markdown(store.list_runs(ws, strategy, symbol), store.list_studies(ws))
+
+
+MIN_FINDINGS, MAX_FINDINGS = 3, 6
+
+
+class Finding(TypedDict):
+    finding: str
+    insight: str
+
+
+def finalize(ws, run_id: int, verdict: str, findings: list, port: int) -> str:
+    run = store.get(ws, run_id)
+    if run is None:
+        return f"查無回測 #{run_id}。"
+    verdict = (verdict or "").strip()
+    if not verdict:
+        return "結論未寫入：總結不得為空白。"
+    if not isinstance(findings, list) or not MIN_FINDINGS <= len(findings) <= MAX_FINDINGS:
+        return f"結論未寫入：發現與洞察須為 {MIN_FINDINGS} 至 {MAX_FINDINGS} 組。"
+    items = []
+    for i, f in enumerate(findings, 1):
+        finding = str((f or {}).get("finding", "")).strip() if isinstance(f, dict) else ""
+        insight = str((f or {}).get("insight", "")).strip() if isinstance(f, dict) else ""
+        if not finding or not insight:
+            return f"結論未寫入：第 {i} 組須同時包含發現（finding）與洞察（insight）。"
+        items.append({"finding": finding, "insight": insight})
+    text = "\n".join([verdict] + [f"{x['finding']}\n{x['insight']}" for x in items])
+    corpus = "\n\n".join(fmt.run_detail(r, port) for r in store.list_runs(ws, study=run.study_key))
+    missing = list(dict.fromkeys(fmt.unverified_numbers(text, corpus)))
+    if missing:
+        return (
+            f"結論未寫入：下列數字未出現在研究 {run.study_key} 任何一次回測的工具輸出中，"
+            "請依工具輸出原文引用後重新送出。\n" + "\n".join(f"- {n}" for n in missing)
+        )
+    at = dt.datetime.now(data.TAIPEI).strftime("%Y-%m-%d %H:%M")
+    conclusion = json.dumps({"verdict": verdict, "findings": items}, ensure_ascii=False)
+    store.finalize(ws, run.study_key, run.id, conclusion, at)
+    return (
+        f"已將回測 #{run.id} 標記為研究 {run.study_key} 的定稿，並寫入結論分析。\n"
+        f"檢視器：{fmt.study_url(run.study_key, port)}"
+    )
+
+
+@server.tool()
+def finalize_study(run_id: int, verdict: str, findings: list[Finding]) -> str:
+    """Mark one backtest as the final one of its study and store the conclusion.
+
+    verdict: one sentence stating whether the strategy is worth using and when.
+    findings: 3 to 6 items; each pairs a finding (a factual observation quoting tool numbers)
+    with an insight (what it means, why it happened, or what to do next).
+    Every number must appear verbatim in the tool output of some backtest in the same study;
+    otherwise nothing is stored and the missing numbers are listed. Finalizing again
+    overwrites the previous choice and conclusion.
+    """
+    return finalize(_ws(), run_id, verdict, findings, _port())
 
 
 @server.tool()
 def open_dashboard(run_id: int | None = None) -> str:
     """Start this workspace's dashboard if needed, open it in the default browser, and return its URL.
 
-    The dashboard lists every run in the workspace and shows new runs without a reload.
-    Pass run_id to open one run.
+    The dashboard lists every study and backtest in the workspace and shows new backtests
+    without a reload. Pass run_id to open one backtest.
     """
     port = _port()
     url = fmt.viewer_url(run_id, port) if run_id else f"http://127.0.0.1:{port}/"

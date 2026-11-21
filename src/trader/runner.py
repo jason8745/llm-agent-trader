@@ -15,9 +15,18 @@ from pathlib import Path
 
 import pandas as pd
 
-from trader import data, store
-from trader.engine import BAR_COLUMNS, Fees, buy_and_hold, fees_for, simulate
-from trader.profit import MIN_BARS, report
+from trader import data, regime, store
+from trader.engine import (
+    BAR_COLUMNS,
+    Fees,
+    Fill,
+    Ledger,
+    RoundTrip,
+    buy_and_hold,
+    fees_for,
+    simulate,
+)
+from trader.profit import daily_returns, regime_table, study_report
 
 DEFAULT_CASH = 1_000_000
 TIMEOUT_SECONDS = 60
@@ -38,7 +47,7 @@ def resolve_strategy(ws: Path, strategy: str) -> Path:
         for path in (c, c.with_suffix(".py")):
             if path.is_file() and path.suffix == ".py":
                 return path.resolve()
-    raise RunError(f"strategy file not found: {strategy} (looked in {ws} and {ws / 'strategies'})")
+    raise RunError(f"找不到策略檔 {strategy}（已搜尋 {ws} 與 {ws / 'strategies'}）。")
 
 
 def _fees(symbol: str, override: dict | None) -> Fees:
@@ -48,35 +57,73 @@ def _fees(symbol: str, override: dict | None) -> Fees:
     known = {f.name for f in fields(Fees)}
     unknown = set(override) - known
     if unknown:
-        raise RunError(f"unknown fee fields {sorted(unknown)}; allowed: {sorted(known)}")
+        raise RunError(f"不支援的費用欄位 {sorted(unknown)}；可用欄位為 {sorted(known)}。")
     return replace(base, **override)
+
+
+def _date(value: str, name: str) -> dt.date:
+    try:
+        return dt.date.fromisoformat(value)
+    except (TypeError, ValueError) as e:
+        raise RunError(f"{name}須為 YYYY-MM-DD 格式的日期，收到 {value!r}。") from e
+
+
+def _periods(dev_start: str, dev_end: str, exec_start: str, exec_end: str) -> None:
+    ds, de = _date(dev_start, "策略開發期間起日"), _date(dev_end, "策略開發期間迄日")
+    es, ee = _date(exec_start, "策略執行期間起日"), _date(exec_end, "策略執行期間迄日")
+    if ds > de:
+        raise RunError(f"策略開發期間起日 {dev_start} 晚於迄日 {dev_end}。")
+    if es > ee:
+        raise RunError(f"策略執行期間起日 {exec_start} 晚於迄日 {exec_end}。")
+    if de >= es:
+        raise RunError(f"策略執行期間起日 {exec_start} 須晚於策略開發期間迄日 {dev_end}。")
+
+
+def _ledger(d: dict) -> Ledger:
+    return Ledger(
+        **{
+            **d,
+            "fills": [Fill(**f) for f in d["fills"]],
+            "round_trips": [RoundTrip(**t) for t in d["round_trips"]],
+        }
+    )
 
 
 def run_backtest(
     ws: Path,
     strategy: str,
     symbol: str,
-    start: str,
-    end: str,
+    dev_start: str,
+    dev_end: str,
+    exec_start: str,
+    exec_end: str,
     hypothesis: str,
     params: dict | None = None,
     cash: float = DEFAULT_CASH,
     fee: dict | None = None,
     timeout: float = TIMEOUT_SECONDS,
 ) -> store.Run:
+    """Development: the strategy on the development bars only. Execution: the strategy on all
+    loaded bars from exec_start on, starting flat with the initial cash; earlier bars (the
+    development period and any gap before exec_start) are indicator history only."""
     if not hypothesis or not hypothesis.strip():
-        raise RunError("hypothesis is required: state what this run is testing")
+        raise RunError("必須填寫 hypothesis，說明本次回測驗證的假設。")
     if cash <= 0:
-        raise RunError(f"cash must be positive, got {cash}")
+        raise RunError(f"初始資金須為正數，收到 {cash}。")
+    _periods(dev_start, dev_end, exec_start, exec_end)
     path = resolve_strategy(ws, strategy)
     symbol = symbol.strip().upper()
     fees = _fees(symbol, fee)
     try:
-        bars = data.load_bars(symbol, start, end)
+        bars = data.load_bars(symbol, dev_start, exec_end)
     except data.DataError as e:
         raise RunError(str(e)) from e
-    if len(bars) < MIN_BARS:
-        raise RunError(f"need at least {MIN_BARS} trading days, got {len(bars)}")
+    dates = [d.strftime("%Y-%m-%d") for d in bars.index]
+    dev_n = sum(dev_start <= d <= dev_end for d in dates)
+    k = next((i for i, d in enumerate(dates) if d >= exec_start), len(dates))
+    for name, n in (("策略開發期間", dev_n), ("策略執行期間", len(dates) - k)):
+        if n < 2:
+            raise RunError(f"{name}僅有 {n} 個交易日，至少需要 2 個交易日。")
 
     source = path.read_text(encoding="utf-8")
     with tempfile.TemporaryDirectory() as tmp:
@@ -85,6 +132,8 @@ def run_backtest(
             "params": params or {},
             "fees": asdict(fees),
             "cash": cash,
+            "dev_bars": dev_n,
+            "exec_start": k,
             "bars_csv": str(Path(tmp) / "bars.csv"),
             "result_path": str(Path(tmp) / "result.json"),
         }
@@ -98,36 +147,51 @@ def run_backtest(
                 timeout=timeout,
             )
         except subprocess.TimeoutExpired as e:
-            raise RunError(f"strategy did not finish within {timeout:g} seconds") from e
+            raise RunError(f"策略未在 {timeout:g} 秒內完成。") from e
         result_file = Path(job["result_path"])
         if not result_file.exists():
-            raise RunError(
-                f"strategy process exited with code {proc.returncode}: {proc.stderr[-2000:]}"
-            )
+            raise RunError(f"策略程序異常結束（代碼 {proc.returncode}）：{proc.stderr[-2000:]}")
         result = json.loads(result_file.read_text())
     if "error" in result:
         raise RunError(result["error"])
     data_sha = data.fingerprint(bars)
     if result["data_sha"] != data_sha:
-        raise RunError("the strategy process read different bars than were fetched")
+        raise RunError("策略程序讀取的價格資料與擷取的資料不一致。")
 
+    dev, exe = _ledger(result["dev"]), _ledger(result["exec"])
+    bh_dev = buy_and_hold(bars.iloc[:dev_n], fees, cash)
+    bh_exec = buy_and_hold(bars, fees, cash, start=k)
+    gap = k - dev_n  # bars after dev_end and before exec_start: history for execution only
+    close = bars["close"].tolist()
+    regimes = regime_table(
+        dates,
+        close,
+        regime.segment(close),
+        daily_returns(dev) + [0.0] * gap + daily_returns(exe),
+        [s > 0 for s in dev.shares] + [False] * gap + [s > 0 for s in exe.shares],
+    )
     payload = {
-        "bars": {"date": result["ledger"]["dates"], **{c: bars[c].tolist() for c in BAR_COLUMNS}},
-        "ledger": result["ledger"],
-        "bh_equity": result["bh_equity"],
-        "report": result["report"],
-        "fees": asdict(fees),
-        "cash": cash,
+        "bars": {"date": dates, **{c: bars[c].tolist() for c in BAR_COLUMNS}},
+        "dev": result["dev"],
+        "exec": result["exec"],
+        "bh_dev": bh_dev.equity,
+        "bh_exec": bh_exec.equity,
+        "report": asdict(study_report(dev, bh_dev, exe, bh_exec)),
+        "regimes": [asdict(r) for r in regimes],
     }
     return store.insert(
         ws,
         created_at=dt.datetime.now(data.TAIPEI).strftime("%Y-%m-%d %H:%M"),
         strategy=path.stem,
         symbol=symbol,
-        start=start,
-        end=end,
+        dev_start=dev_start,
+        dev_end=dev_end,
+        exec_start=exec_start,
+        exec_end=exec_end,
         hypothesis=hypothesis.strip(),
         params=result["params"],
+        cash=cash,
+        fee=asdict(fees),
         source=source,
         source_sha=hashlib.sha256(source.encode()).hexdigest(),
         data_sha=data_sha,
@@ -152,21 +216,18 @@ def _child(job: dict) -> dict:
         base = dict(getattr(mod, "PARAMS", {}))
         unknown = set(job["params"]) - set(base)
         if unknown:
-            return {"error": f"unknown params {sorted(unknown)}; PARAMS defines {sorted(base)}"}
+            return {"error": f"未知的參數 {sorted(unknown)}；PARAMS 定義的參數為 {sorted(base)}。"}
         p = {**base, **job["params"]}
         bars = pd.read_csv(job["bars_csv"], index_col="date", parse_dates=["date"])
         fees = Fees(**job["fees"])
-        led = simulate(bars, lambda h, pos: mod.on_bar(h, pos, p), fees, job["cash"])
-        bh = buy_and_hold(bars, fees, job["cash"])
-        rep = report(led, bh)
+        decide = lambda h, pos: mod.on_bar(h, pos, p)  # noqa: E731
+        dev = simulate(bars.iloc[: job["dev_bars"]], decide, fees, job["cash"])
+        exe = simulate(bars, decide, fees, job["cash"], start=job["exec_start"])
     except Exception as e:
         return {"error": _strategy_error(e, path)}
-    ledger = asdict(led)
-    ledger["unrealized_pnl"] = led.unrealized_pnl
     return {
-        "ledger": ledger,
-        "bh_equity": bh.equity,
-        "report": asdict(rep),
+        "dev": asdict(dev),
+        "exec": asdict(exe),
         "params": p,
         "data_sha": data.fingerprint(bars),
     }

@@ -7,12 +7,13 @@ from bars import random_bars
 from trader.engine import NO_FEES, TW_STOCK_FEES, Ledger, RoundTrip, buy_and_hold, simulate
 from trader.profit import (
     Drawdown,
+    chained_returns,
     daily_returns,
+    drawdown_curve,
     drawdowns,
     metrics,
     period,
     regime_table,
-    segment,
     study_report,
     trades,
 )
@@ -171,7 +172,9 @@ def test_metrics_invariants(seed):
     led = simulate(bars, lambda _h, _p: float(rng.choice([0, 1])), TW_STOCK_FEES, 1e6)
     m = metrics(led)
     assert math.prod(1 + r for r in daily_returns(led)) - 1 == pytest.approx(m.ret, rel=1e-9)
-    assert m.mdd == pytest.approx(segment(led.initial_cash, led.equity).mdd, abs=1e-12)
+    assert m.mdd == pytest.approx(
+        min(0.0, *drawdown_curve(led.initial_cash, led.equity)), abs=1e-12
+    )
     assert trades(led).count == len(led.round_trips)
     bh = metrics(buy_and_hold(bars, TW_STOCK_FEES, 1e6))
     assert bh.mdd <= 0 and bh.volatility > 0
@@ -191,3 +194,18 @@ def test_regime_table_golden():
     assert a.exposure == 0.5
     assert b.price_change == pytest.approx(132 / 99 - 1)
     assert b.strategy == pytest.approx(0.2) and b.exposure == 1.0
+
+
+def test_drawdown_curve_starts_at_initial_cash():
+    assert drawdown_curve(100, [90, 110, 99, 120]) == pytest.approx([-0.1, 0, -0.1, 0])
+
+
+def test_chained_returns_keep_each_period_return_exact():
+    cash = 1000.0
+    dev = [1000.0, 1100.0, 1200.0]  # development return +20%
+    exe = [900.0, 1080.0]  # execution restarts at 1000; return +8%
+    out = chained_returns(cash, dev, exe)
+    # dev: e/1000 - 1; exec: 1.2 * e/1000 - 1
+    assert out == pytest.approx([0.0, 0.1, 0.2, 0.08, 0.296])
+    # inside the execution period the move from its start equals the execution return
+    assert (1 + out[-1]) / (1 + out[2]) - 1 == pytest.approx(exe[-1] / cash - 1)

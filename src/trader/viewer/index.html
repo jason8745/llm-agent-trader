@@ -9,13 +9,20 @@
 <script src="/static/lightweight-charts.js"></script>
 </head>
 <body>
-<header class="bar"><b>▍AGENT TRADER</b><span id="ws" class="muted"></span><span class="sp"></span><span class="muted">樣本內 70% / 樣本外 30% · 紅漲綠跌</span></header>
-<div class="split">
-  <nav class="list" aria-label="回測紀錄">
-    <div class="mode"><button data-mode="tl" aria-pressed="true">時間軸</button><button data-mode="rank" aria-pressed="false">排行</button></div>
-    <div id="lst"></div>
-  </nav>
-  <main class="detail" id="d"></main>
+<header class="topbar"><b>▍AGENT TRADER</b><span id="ws"></span><span class="sp"></span><span id="legacy"></span><span>紅漲綠跌</span><a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">圖表：TradingView Lightweight Charts</a></header>
+<div class="desk">
+  <nav class="side" aria-label="依股票分組的研究"><div class="tools"><span>研究</span><span>依股票分組</span></div><div id="tree"></div></nav>
+  <main class="center">
+    <div class="ctx" id="ctx"></div>
+    <div class="hl" id="hl"></div>
+    <div class="charts">
+      <section class="panel"><div class="ph"><b>K 線與成交量</b><span class="legend" id="lg1"></span><span class="readout" id="r1"></span></div><div class="chart" id="c1" role="img" aria-label="K 線、成交量、買賣點與盤勢分段"></div></section>
+      <section class="panel"><div class="ph"><b>累積報酬率</b><span class="legend"><span><i class="ln gold"></i>策略</span><span><i class="ln dash"></i>買進並持有</span></span><span class="readout" id="r2"></span></div><div class="chart" id="c2" role="img" aria-label="策略與買進並持有的累積報酬率"></div></section>
+      <section class="panel"><div class="ph"><b>回撤</b><span class="mu">策略執行期間以初始資金重新開始，回撤由 0 起算</span><span class="readout" id="r3"></span></div><div class="chart" id="c3" role="img" aria-label="策略自高點回落的幅度"></div></section>
+    </div>
+    <section class="drawer" id="drawer"></section>
+  </main>
+  <aside class="right" id="right"></aside>
 </div>
 <script src="/static/app.js"></script>
 </body>

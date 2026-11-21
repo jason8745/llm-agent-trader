@@ -27,7 +27,7 @@ def _parse_date(s: str) -> dt.date:
     try:
         return dt.date.fromisoformat(s)
     except ValueError as e:
-        raise DataError(f"dates must be YYYY-MM-DD, got {s!r}") from e
+        raise DataError(f"日期須為 YYYY-MM-DD 格式，收到 {s!r}。") from e
 
 
 def _download(symbol: str, start: dt.date, end: dt.date) -> pd.DataFrame:
@@ -40,7 +40,7 @@ def _download(symbol: str, start: dt.date, end: dt.date) -> pd.DataFrame:
         actions=True,
     )
     if raw.empty:
-        raise DataError(f"no data for {symbol} between {start} and {end}")
+        raise DataError(f"{symbol} 在 {start} 至 {end} 之間沒有資料。")
     bars = pd.DataFrame(
         {
             "open": raw["Open"],
@@ -62,7 +62,7 @@ def load_bars(symbol: str, start: str, end: str) -> pd.DataFrame:
     """
     s, e = _parse_date(start), _parse_date(end)
     if s > e:
-        raise DataError(f"start {start} is after end {end}")
+        raise DataError(f"起日 {start} 晚於迄日 {end}。")
     path = cache_dir() / "ohlcv" / f"{symbol.upper()}_{s}_{e}.csv"
     if path.exists():
         return pd.read_csv(path, index_col="date", parse_dates=["date"])[list(BAR_COLUMNS)]
@@ -80,6 +80,16 @@ def fingerprint(bars: pd.DataFrame) -> str:
 @cache
 def stock_list() -> list[dict]:
     return json.loads(STOCKS_JSON.read_text(encoding="utf-8"))
+
+
+@cache
+def _names() -> dict[str, str]:
+    return {s["symbol"]: s["name"] for s in stock_list()}
+
+
+def stock_name(symbol: str) -> str | None:
+    """Chinese name of a listed Taiwan stock or ETF, or None for symbols outside the list."""
+    return _names().get(symbol.strip().upper())
 
 
 def search_stock(query: str, limit: int = 10) -> list[dict]:

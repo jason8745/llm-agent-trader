@@ -112,10 +112,10 @@ Decide = Callable[[pd.DataFrame, float], float]
 
 def _parse_target(value: object) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise StrategyError(f"on_bar must return a number between 0 and 1, got {value!r}")
+        raise StrategyError(f"on_bar 必須回傳 0 到 1 之間的數字，收到 {value!r}。")
     w = float(value)
     if not math.isfinite(w) or w < 0 or w > 1:
-        raise StrategyError(f"on_bar must return a number between 0 and 1, got {value!r}")
+        raise StrategyError(f"on_bar 必須回傳 0 到 1 之間的數字，收到 {value!r}。")
     return w
 
 

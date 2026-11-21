@@ -208,3 +208,5 @@ __marimo__/
 
 # llm-agent-trader workspace state
 .trader/
+
+.claude/worktrees/

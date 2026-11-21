@@ -1,6 +1,7 @@
 """Performance metrics. Every number the harness reports is computed here.
 
-Returns are measured against the initial cash, so (1 + IS) * (1 + OOS) == 1 + total.
+A backtest has a development period and an execution period, each its own ledger that
+starts flat with the initial cash; returns are measured against that cash.
 """
 
 import datetime as dt
@@ -11,57 +12,10 @@ from dataclasses import dataclass
 from trader.engine import Ledger
 from trader.regime import Regime
 
-IS_FRACTION = 0.7
-MIN_BARS = 3  # smallest n where both in-sample and out-of-sample are non-empty
 OVERFIT_GAP = 0.15
 DAYS_PER_YEAR = 365.25
 TRADING_DAYS_PER_YEAR = 252
 TOP_DRAWDOWNS = 5
-
-
-@dataclass(frozen=True)
-class Segment:
-    ret: float
-    mdd: float
-
-
-@dataclass(frozen=True)
-class Report:
-    split: int
-    total: Segment
-    in_sample: Segment
-    out_of_sample: Segment
-    bh_total: Segment
-    bh_in_sample: Segment
-    bh_out_of_sample: Segment
-    in_sample_annualized: float | None
-    out_of_sample_annualized: float | None
-    trades: int
-    win_rate: float | None
-    final_equity: float
-    realized_pnl: float
-    unrealized_pnl: float
-
-    @property
-    def overfit(self) -> bool:
-        """Compares annualized returns: the in-sample span is longer, so raw returns would
-        flag strategies that did better out of sample."""
-        a, b = self.in_sample_annualized, self.out_of_sample_annualized
-        return a is not None and b is not None and a - b > OVERFIT_GAP
-
-
-def split_index(n: int) -> int:
-    if n < MIN_BARS:
-        raise ValueError(f"need at least {MIN_BARS} bars, got {n}")
-    return math.floor(IS_FRACTION * n)
-
-
-def segment(start_value: float, values: list[float]) -> Segment:
-    peak, mdd = start_value, 0.0
-    for v in values:
-        peak = max(peak, v)
-        mdd = min(mdd, v / peak - 1)
-    return Segment(ret=values[-1] / start_value - 1, mdd=mdd)
 
 
 def annualize(ret: float, start: str, end: str) -> float | None:
@@ -69,38 +23,6 @@ def annualize(ret: float, start: str, end: str) -> float | None:
     if days <= 0 or ret <= -1:
         return None
     return (1 + ret) ** (DAYS_PER_YEAR / days) - 1
-
-
-def _segments(led: Ledger, s: int) -> tuple[Segment, Segment, Segment]:
-    e, c0 = led.equity, led.initial_cash
-    return segment(c0, e), segment(c0, e[:s]), segment(e[s - 1], e[s - 1 :])
-
-
-def report(led: Ledger, bh: Ledger) -> Report:
-    s = split_index(len(led.equity))
-    total, is_, oos = _segments(led, s)
-    bh_total, bh_is, bh_oos = _segments(bh, s)
-    trips = led.round_trips
-    d = led.dates
-    return Report(
-        split=s,
-        total=total,
-        in_sample=is_,
-        out_of_sample=oos,
-        bh_total=bh_total,
-        bh_in_sample=bh_is,
-        bh_out_of_sample=bh_oos,
-        in_sample_annualized=annualize(is_.ret, d[0], d[s - 1]),
-        out_of_sample_annualized=annualize(oos.ret, d[s - 1], d[-1]),
-        trades=len(trips),
-        win_rate=sum(t.pnl > 0 for t in trips) / len(trips) if trips else None,
-        final_equity=led.equity[-1],
-        realized_pnl=led.realized_pnl,
-        unrealized_pnl=led.unrealized_pnl,
-    )
-
-
-# --- Per-period metrics: one development period and one execution period. ---
 
 
 @dataclass(frozen=True)
@@ -200,6 +122,26 @@ def _episode(d, peak, peak_i, low, trough_i, recovery_i) -> Drawdown:
         recovery=d[recovery_i] if recovery_i is not None else None,
         bars=end - max(peak_i, 0),
     )
+
+
+def drawdown_curve(initial_cash: float, equity: list[float]) -> list[float]:
+    """Per-bar drawdown from the running peak, which starts at the initial cash."""
+    peak, out = initial_cash, []
+    for v in equity:
+        peak = max(peak, v)
+        out.append(v / peak - 1)
+    return out
+
+
+def chained_returns(initial_cash: float, dev: list[float], exe: list[float]) -> list[float]:
+    """Cumulative return from the development start, one value per development and execution bar.
+
+    The execution period restarts from the initial cash, so its curve is chained to the
+    development end point: (1 + R_dev) * (E_t / initial cash) - 1. Inside the execution period
+    the change relative to its start therefore equals the execution return exactly.
+    """
+    base = dev[-1] / initial_cash
+    return [e / initial_cash - 1 for e in dev] + [base * e / initial_cash - 1 for e in exe]
 
 
 def metrics(led: Ledger) -> Metrics:

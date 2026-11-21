@@ -2,11 +2,11 @@
 
 ![star](star-history-20251112.png)
 
-A Taiwan stock backtesting harness for coding agents. You discuss a strategy with Claude Code, Claude writes it as a small Python file, and a deterministic engine backtests it. Every run reports in-sample, out-of-sample, and buy-and-hold results side by side, so you can tell a real edge from a curve fit.
+A Taiwan stock backtesting harness for coding agents. You discuss a strategy with Claude Code, Claude writes it as a small Python file, and a deterministic engine backtests it. Every backtest has two explicit periods, a development period (策略開發期間) for designing and tuning the strategy and a later execution period (策略執行期間) that simulates running it live, each next to buy-and-hold, so you can tell a real edge from a curve fit.
 
 Claude Code is the brain. This project is the hands: Taiwan market data, MCP tools, the backtest engine, the profit module, and a read-only dashboard. No LLM runs inside the backtest loop, and you do not need an LLM API key.
 
-![dashboard](docs/v2/evidence/pr6/detail-timeline.png)
+![dashboard](docs/v2/evidence/pr20/dashboard-desktop.png)
 
 ## How it works
 
@@ -107,22 +107,35 @@ For example:
 
 > 我想研究台積電的趨勢追蹤策略。請使用 2023-01-01 至 2025-12-31 的資料，設計一個均線類策略並回測，至少迭代兩次，最後告訴我結論。
 
+Before the first backtest, Claude confirms five things with you as numbered questions, each with a recommended answer. Reply 「yes」 to accept all of them:
+
+1. The symbol, with its Chinese name (`2330.TW 台積電`).
+2. The strategy logic and its starting parameters.
+3. The development period (策略開發期間), used to design and tune the strategy.
+4. The execution period (策略執行期間), a later period that simulates running the finished strategy. It starts flat with fresh cash and is never used for tuning. By default it is the last 12 months.
+5. Starting cash and fees.
+
 Claude asks for permission before it writes a file or calls a `trader` tool. Approve these requests. Claude then:
 
-1. Looks up the symbol (`search_stock("台積電")` returns `2330.TW`).
-2. Writes `strategies/<name>.py`.
-3. Calls `run_backtest` with a stated hypothesis for each iteration and tunes on in-sample results only.
-4. Reports the final out-of-sample result against buy-and-hold, with a dashboard link.
+1. Writes `strategies/<name>.py`.
+2. Calls `run_backtest` with a stated hypothesis for each iteration and tunes on the development period only. Both periods are always reported next to buy-and-hold, so a strategy that only worked on the data it was tuned on shows up immediately.
+3. Picks the final backtest and stores the conclusion with `finalize_study`: one verdict sentence plus 3 to 6 findings, each paired with an insight. Every number in the conclusion must appear in the tool output, or the tool refuses to store it.
 
-A full real session is in [docs/v2/evidence/pr7/claude-session.md](docs/v2/evidence/pr7/claude-session.md).
+A full real session, from the confirmation questions to the stored conclusion, is in [docs/v2/evidence/pr20/claude-session-turn1.md](docs/v2/evidence/pr20/claude-session-turn1.md) and [claude-session-turn2.md](docs/v2/evidence/pr20/claude-session-turn2.md).
 
 ### 4. Open the dashboard
 
 Ask Claude 「打開 dashboard」 at any time, and it opens the dashboard in your browser. Each backtest reply also ends with a link, for example `http://127.0.0.1:8765/runs/1`. The port is 8765 unless another project's dashboard already uses it, so prefer the link Claude gives you.
 
-Keep the dashboard open next to Claude Code. Each new backtest appears within a few seconds without a reload, and the page switches to it. If you open an older run, the page stays on it and only the list updates.
+Keep the dashboard open next to Claude Code. Each new backtest appears within a few seconds without a reload, and the page switches to it. If you open an older backtest, the page stays on it and only the list updates.
 
-The dashboard lists every run in this folder. Each run shows the hypothesis, the in-sample, out-of-sample, and buy-and-hold results, a candlestick chart with buy and sell markers and the equity curve, the fills, the closed trades, and the strategy source.
+The dashboard is chart first:
+
+- **Left.** Your studies, grouped by stock. A study is one symbol, one strategy file and both periods, with every iteration listed under it.
+- **Center.** The iteration switcher, the hypothesis and four headline numbers, then three synchronized charts: candlesticks with volume, buy and sell markers and the market regimes; the cumulative return of the strategy against buy-and-hold; and the drawdown. Hover any chart to read that day's values. Fills, closed trades, the deepest drawdowns, the regime table and the strategy source are in the drawer below.
+- **Right.** The verdict, both periods side by side with the overfitting check, the findings and insights, and how the strategy did in each market regime.
+
+The execution period restarts from fresh cash, so the cumulative return chart continues the execution curve from the end of the development curve. Inside the execution period, the rise or fall of the curve equals the execution return exactly.
 
 The dashboard stops when Claude Code exits. Next time, start Claude Code in the same folder and ask it to open the dashboard again. Without Claude Code, run this in the project folder:
 
@@ -160,7 +173,7 @@ def on_bar(hist, pos, p):
     return 1.0 if fast > slow else 0.0
 ```
 
-- `hist` holds the bars up to and including today: `open, high, low, close, volume, dividend`. The strategy cannot see tomorrow.
+- `hist` holds the bars up to and including today: `open, high, low, close, volume, dividend`. The strategy cannot see tomorrow. In the execution period `hist` also holds the earlier bars, so indicators are already warmed up.
 - The return value is the target position, from 0.0 to 1.0. It fills at the next day's open, and the position changes only when the returned target changes.
 - `trader.ta` provides `sma`, `ema`, `rsi`, `macd`, `bbands`, and `atr` with TA-Lib conventions. Indicators compose, for example `ta.ema(ta.rsi(hist.close, 14), 5)`.
 
@@ -168,8 +181,9 @@ def on_bar(hist, pos, p):
 
 - **Fees (Taiwan).** Commission is 0.1425% on both sides with a NT$20 minimum. Sell tax is 0.3% for stocks and 0.1% for ETFs. Both are floored to whole NT$. Other markets default to zero fees.
 - **Dividends.** Prices are split-adjusted, not dividend-adjusted. Cash dividends are credited on the ex-date, so an ex-dividend drop is not counted as a loss.
-- **In-sample and out-of-sample.** The first 70% of the bars is in-sample and the last 30% is out-of-sample, in one continuous run. Returns are measured against initial cash, so (1 + IS) × (1 + OOS) = 1 + total.
-- **⚑ overfit flag.** It shows when the annualized in-sample return exceeds the annualized out-of-sample return by more than 15 points.
+- **Two periods.** The development period runs on its own bars only. The execution period starts flat with the initial cash at the first trading day on or after its start date; the strategy may use every earlier loaded bar as history. Buy-and-hold is computed for each period the same way, and each period's returns are measured against the initial cash.
+- **⚑ overfit flag.** It shows when the annualized development return exceeds the annualized execution return by more than 15 points.
+- **Market regimes.** The closes of all loaded bars are split by fixed rules into up, down and range legs, and the strategy's return and time in the market are reported per leg.
 - **One formatter.** Every number shown by the tools, the CLI, and the dashboard comes from `trader.profit` and is rendered by `trader.fmt`. Tests enforce identical strings across all three.
 
 Full definitions are in [docs/v2/design.md](docs/v2/design.md) section 4.
@@ -180,14 +194,14 @@ The same features work without Claude Code. Run these in a project folder, prefi
 
 ```bash
 llm-agent-trader search 台積電
-llm-agent-trader backtest ma_cross 2330.TW 2023-01-01 2025-12-31 --hypothesis "..."
+llm-agent-trader backtest ma_cross 2330.TW 2023-01-01 2024-12-31 2025-01-01 2025-12-31 --hypothesis "..."
 llm-agent-trader runs
 llm-agent-trader show 1
 llm-agent-trader ui
 llm-agent-trader mcp
 ```
 
-`backtest` reads `strategies/ma_cross.py` from the current folder.
+`backtest` reads `strategies/ma_cross.py` from the current folder. The four dates are the development start and end, then the execution start and end.
 
 ## Development
 

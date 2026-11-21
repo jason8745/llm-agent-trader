@@ -1,15 +1,17 @@
 import asyncio
+import json
 import os
 import re
 import subprocess
 import sys
 
-from conftest import END, START, SYMBOL
+from conftest import BT, PERIODS, SYMBOL
 from mcp import Client, StdioServerParameters
 
-from trader import fmt, store
+from trader import fmt, mcp_server, runner, store
 
 HYP = "以 5 日與 20 日均線交叉作為基準策略。"
+BACKTEST = {"strategy": "ma_cross", "symbol": SYMBOL, "hypothesis": HYP, **BT}
 
 
 def call_tools(calls):
@@ -30,23 +32,16 @@ def call_tools(calls):
 
 
 def test_mcp_tools_over_stdio(ws):
-    tools, (found, result, listing) = call_tools(
+    tools, (found, result, detail, listing) = call_tools(
         [
             ("search_stock", {"query": "台積電"}),
-            (
-                "run_backtest",
-                {
-                    "strategy": "ma_cross",
-                    "symbol": SYMBOL,
-                    "start": START,
-                    "end": END,
-                    "hypothesis": HYP,
-                },
-            ),
+            ("run_backtest", BACKTEST),
+            ("get_run", {"run_id": 1}),
             ("list_runs", {}),
         ]
     )
     assert tools == [
+        "finalize_study",
         "get_ohlcv",
         "get_run",
         "list_runs",
@@ -59,25 +54,16 @@ def test_mcp_tools_over_stdio(ws):
     run = store.get(ws, run_id)
     port = int(re.search(r"127\.0\.0\.1:(\d+)/runs/", result).group(1))
     assert result == fmt.run_text(run, port)
-    assert HYP in listing
+    assert detail.startswith(fmt.run_detail(run, port)) and run.source in detail
+    assert "成交明細" in detail and "最深回撤（策略執行期間）" in detail
+    assert HYP in listing and f"研究 {run.study_key}" in listing
+    for text in (result, detail, listing, mcp_server.INSTRUCTIONS):
+        assert "樣本內" not in text and "樣本外" not in text
 
 
 def test_mcp_and_cli_render_identical_numbers(ws, monkeypatch):
     monkeypatch.setenv("TRADER_VIEWER_PORT", "18965")
-    _, (result,) = call_tools(
-        [
-            (
-                "run_backtest",
-                {
-                    "strategy": "ma_cross",
-                    "symbol": SYMBOL,
-                    "start": START,
-                    "end": END,
-                    "hypothesis": HYP,
-                },
-            )
-        ]
-    )
+    _, (result,) = call_tools([("run_backtest", BACKTEST)])
     run_id = int(re.search(r"回測 #(\d+)", result).group(1))
     cli = subprocess.run(
         [sys.executable, "-m", "trader.cli", "show", str(run_id)],
@@ -86,10 +72,19 @@ def test_mcp_and_cli_render_identical_numbers(ws, monkeypatch):
         check=True,
     ).stdout.strip()
     assert cli == result
-    s = fmt.summary(store.get(ws, run_id).report, store.get(ws, run_id).dates)
-    for key, value in s.items():
-        if key != "overfit":
-            assert value in cli and value in result, key
+
+
+def test_cli_backtest_and_runs(ws):
+    cli = [sys.executable, "-m", "trader.cli"]
+    out = subprocess.run(
+        [*cli, "backtest", "ma_cross", SYMBOL, *PERIODS, "--hypothesis", HYP],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert out.startswith("回測 #1 · 研究 ")
+    runs = subprocess.run([*cli, "runs"], capture_output=True, text=True, check=True).stdout
+    assert "| 1 | 1 |" in runs and HYP in runs
 
 
 def test_mcp_errors_are_messages_not_crashes(ws):
@@ -97,19 +92,67 @@ def test_mcp_errors_are_messages_not_crashes(ws):
         "def on_bar(h, pos, p):\n    raise ValueError('bad')\n"
     )
     _, (err, ok) = call_tools(
-        [
-            (
-                "run_backtest",
-                {
-                    "strategy": "spin",
-                    "symbol": SYMBOL,
-                    "start": START,
-                    "end": END,
-                    "hypothesis": HYP,
-                },
-            ),
-            ("get_run", {"run_id": 999}),
-        ]
+        [("run_backtest", {**BACKTEST, "strategy": "spin"}), ("get_run", {"run_id": 999})]
     )
     assert err.startswith("回測失敗：") and "ValueError: bad" in err
     assert ok == "查無回測 #999。"
+
+
+def first_study(ws):
+    a = runner.run_backtest(ws, "ma_cross", SYMBOL, *PERIODS, HYP)
+    b = runner.run_backtest(ws, "ma_cross", SYMBOL, *PERIODS, HYP, params={"fast": 8})
+    return a, b
+
+
+def test_finalize_accepts_numbers_quoted_from_the_study(ws):
+    a, b = first_study(ws)
+    ra, rb = a.report, b.report
+    dev_ret = fmt.pct(ra.dev.strategy.ret)  # from the first iteration's output
+    exec_mdd = fmt.pct(rb.exec.strategy.mdd)
+    trips = fmt.shares(rb.exec.trades.count)
+    verdict = "本策略僅適用於重視風險控制的情境。"
+    findings = [
+        {
+            "finding": f"策略開發期間報酬率為 {dev_ret}。",
+            "insight": "開發期間的表現是調整參數的唯一依據。",
+        },
+        {
+            "finding": f"策略執行期間最大回撤為 {exec_mdd}。",
+            "insight": "執行期間的風險須與買進並持有基準比較。",
+        },
+        {
+            "finding": f"策略執行期間交易次數 {trips} 次。",
+            "insight": "本研究以 2025 年以前的資料為準，交易次數少時統計可信度有限。",
+        },
+    ]
+    out = mcp_server.finalize(ws, b.id, verdict, findings, 8765)
+    assert out.endswith(f"http://127.0.0.1:8765/studies/{b.study_key}"), out
+    s = store.get_study(ws, b.study_key)
+    assert s.final_run_id == b.id and s.finalized_at
+    assert json.loads(s.conclusion) == {"verdict": verdict, "findings": findings}
+    again = mcp_server.finalize(ws, a.id, "改以第一次迭代定稿。", findings, 8765)
+    assert "已將回測" in again and store.get_study(ws, a.study_key).final_run_id == a.id
+
+
+def test_finalize_rejects_invented_numbers_and_stores_nothing(ws):
+    a, _ = first_study(ws)
+    real = fmt.pct(a.report.dev.strategy.ret)
+    ok = {"finding": f"報酬率為 {real}。", "insight": "依工具輸出引用。"}
+    bad = {"finding": "年化約 +31.07%。", "insight": "期末權益 1,234,567。"}
+    out = mcp_server.finalize(ws, a.id, "總結。", [ok, bad, ok], 8765)
+    assert out.startswith("結論未寫入")
+    assert "- +31.07%" in out and "- 1,234,567" in out and real not in out
+    s = store.get_study(ws, a.study_key)
+    assert s.final_run_id is None and s.conclusion is None and s.finalized_at is None
+    assert mcp_server.finalize(ws, 999, "x", [ok] * 3, 8765) == "查無回測 #999。"
+
+
+def test_finalize_requires_paired_findings_and_insights(ws):
+    a, _ = first_study(ws)
+    pair = {"finding": "發現。", "insight": "洞察。"}
+    assert "總結不得為空白" in mcp_server.finalize(ws, a.id, " ", [pair] * 3, 8765)
+    assert "3 至 6 組" in mcp_server.finalize(ws, a.id, "總結。", [pair] * 2, 8765)
+    assert "3 至 6 組" in mcp_server.finalize(ws, a.id, "總結。", [pair] * 7, 8765)
+    missing = [pair, {"finding": "只有發現。", "insight": ""}, pair]
+    assert "第 2 組須同時包含" in mcp_server.finalize(ws, a.id, "總結。", missing, 8765)
+    assert store.get_study(ws, a.study_key).conclusion is None

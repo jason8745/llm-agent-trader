@@ -1,0 +1,7 @@
+16:02:14 dashboard for this workspace is on port 8765; opening once, never reloading
+16:02:16 runs listed=0 findings shown=False selected= url=http://127.0.0.1:8765/
+16:02:18 runs listed=1 findings shown=False selected=第 1 次 · fast=20, slow=60, trend=0 url=http://127.0.0.1:8765/
+16:02:23 runs listed=2 findings shown=False selected= url=http://127.0.0.1:8765/runs/2
+16:02:29 runs listed=3 findings shown=False selected= url=http://127.0.0.1:8765/runs/3
+16:02:42 runs listed=3 findings shown=True selected=第 3 次 · fast=1, slow=60, trend=0 url=http://127.0.0.1:8765/runs/3
+16:02:58 page errors: none

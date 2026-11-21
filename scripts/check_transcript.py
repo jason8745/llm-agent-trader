@@ -7,8 +7,9 @@ prose avoids the colloquial terms the skill's glossary forbids. Exits 1 on any v
 """
 
 import json
-import re
 import sys
+
+from trader.fmt import unverified_numbers
 
 GLOSSARY = [
     "訓練段",
@@ -44,9 +45,6 @@ OBSERVED = [
     "想讓",
 ]
 BANNED = GLOSSARY + OBSERVED
-NUMBER = re.compile(r"[+-]?\d[\d,]*(?:\.\d+)?%?")
-# A calendar year in prose ("2022 年") names a period, not a computed result.
-YEAR = re.compile(r"(?<![\d.,+-])\d{4}(?=\s*年)")
 
 
 def main(stream_path: str, out_path: str) -> int:
@@ -82,10 +80,9 @@ def main(stream_path: str, out_path: str) -> int:
     corpus = "\n".join(results)
     problems = []
     for p in prose:
-        for n in NUMBER.findall(YEAR.sub("", p)):
-            bare = n.lstrip("+")
-            if n not in corpus and bare not in corpus and len(bare.strip("%")) > 1:
-                problems.append(f"number not found in any tool result: {n}")
+        problems += [
+            f"number not found in any tool result: {n}" for n in unverified_numbers(p, corpus)
+        ]
         problems += [f"banned colloquial term: {w}" for w in BANNED if w in p]
     md.append("## Automated checks\n")
     md.append(
