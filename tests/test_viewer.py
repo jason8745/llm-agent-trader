@@ -193,7 +193,7 @@ def test_tree_and_study_payloads(ws, served):
         fmt.pct(ex.bh.ret),
     )
     assert api(f"{served}/api/runs/{third.id}")["diff"] == "參數未變更"
-    assert api(f"{served}/api/info") == {"workspace": str(ws), "legacy_runs": 0}
+    assert api(f"{served}/api/info") == {"workspace": str(ws)}
 
 
 def test_frontend_never_formats_numbers():

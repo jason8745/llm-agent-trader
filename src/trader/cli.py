@@ -2,7 +2,7 @@ import argparse
 import json
 import sys
 
-from trader import __version__, fmt, runner, store
+from trader import __version__, fmt, runner, store, workspace
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -31,7 +31,11 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     from trader.mcp_server import VIEWER_PORT
 
-    ws = runner.workspace()
+    ws = workspace.path()
+    if args.cmd in {"ui", "backtest", "show", "runs"} and not ws.is_dir():
+        sys.exit(
+            f"研究資料夾尚未建立：{ws}\n請在 Claude 中說「開始使用台股回測」，或手動建立此資料夾。"
+        )
     if args.cmd == "mcp":
         from trader.mcp_server import main as serve
 

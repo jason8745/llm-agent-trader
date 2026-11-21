@@ -45,7 +45,7 @@ def _diffs(runs: list[store.Run]) -> dict[int, str]:
 
 
 def info_payload(workspace: Path) -> dict:
-    return {"workspace": str(workspace), "legacy_runs": store.legacy_count(workspace)}
+    return {"workspace": str(workspace)}
 
 
 def tree_payload(workspace: Path) -> list[dict]:

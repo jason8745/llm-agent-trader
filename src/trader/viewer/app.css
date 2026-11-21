@@ -6,7 +6,7 @@ button{font:inherit;color:inherit}button:focus-visible,summary:focus-visible,a:f
 .topbar{display:flex;align-items:center;gap:12px;padding:9px 16px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--muted)}
 .topbar b{font-family:var(--sans);font-size:14px;color:var(--accent);white-space:nowrap}.topbar .sp{flex:1}
 .topbar a{color:var(--muted);text-decoration:none;white-space:nowrap}.topbar a:hover{color:var(--ink)}
-#ws{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#legacy{white-space:nowrap}
+#ws{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .desk{flex:1;display:grid;grid-template-columns:272px minmax(0,1fr) 384px;min-height:0}
 .side{border-right:1px solid var(--line);overflow:auto}
 .side .tools{display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px}
@@ -89,5 +89,5 @@ pre{font-family:var(--mono);font-size:12px;background:#11141a;border:1px solid v
 .meta{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px;word-break:break-all}
 .empty{padding:40px 20px;color:var(--muted);line-height:1.8}
 @media(max-width:1280px){.desk{grid-template-columns:240px minmax(0,1fr) 340px}.kpis{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:960px){body{height:auto;overflow:auto}.charts{display:flex;flex-direction:column;min-height:0}.panel #c1{flex:none;height:380px}.panel #c2{flex:none;height:230px}.panel #c3{flex:none;height:170px}.kpi .v{font-size:20px}#ws,#legacy,.topbar a{display:none}.desk{grid-template-columns:1fr}.side{max-height:40vh;border-right:0;border-bottom:1px solid var(--line)}.right{border-left:0;border-top:1px solid var(--line)}.center{overflow:visible}}
+@media(max-width:960px){body{height:auto;overflow:auto}.charts{display:flex;flex-direction:column;min-height:0}.panel #c1{flex:none;height:380px}.panel #c2{flex:none;height:230px}.panel #c3{flex:none;height:170px}.kpi .v{font-size:20px}#ws,.topbar a{display:none}.desk{grid-template-columns:1fr}.side{max-height:40vh;border-right:0;border-bottom:1px solid var(--line)}.right{border-left:0;border-top:1px solid var(--line)}.center{overflow:visible}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}

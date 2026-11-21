@@ -200,13 +200,3 @@ def finalize(workspace: Path, key: str, run_id: int, conclusion: str, at: str) -
             "UPDATE studies SET final_run_id = ?, conclusion = ?, finalized_at = ? WHERE key = ?",
             (run_id, conclusion, at, key),
         )
-
-
-def legacy_count(workspace: Path) -> int:
-    """Backtests stored by earlier versions in the old `runs` table; not shown anywhere."""
-    with connect(workspace) as con:
-        if not con.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='runs'"
-        ).fetchone():
-            return 0
-        return con.execute("SELECT COUNT(*) FROM runs").fetchone()[0]

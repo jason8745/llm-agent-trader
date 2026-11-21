@@ -1,166 +1,134 @@
-# LLM Agent Trader
+# 台股回測 LLM Agent Trader
 
 ![star](star-history-20251112.png)
 
-A Taiwan stock backtesting harness for coding agents. You discuss a strategy with Claude Code, Claude writes it as a small Python file, and a deterministic engine backtests it. Every backtest has two explicit periods, a development period (策略開發期間) for designing and tuning the strategy and a later execution period (策略執行期間) that simulates running it live, each next to buy-and-hold, so you can tell a real edge from a curve fit.
+用聊天的方式研究台股策略。你說出想法，Claude 撰寫策略、回測、解讀結果，並在 dashboard 上即時呈現。每一個數字都由確定性的回測引擎計算，Claude 只負責討論與解讀，不自行計算。
 
-Claude Code is the brain. This project is the hands: Taiwan market data, MCP tools, the backtest engine, the profit module, and a read-only dashboard. No LLM runs inside the backtest loop, and you do not need an LLM API key.
+不需要寫程式，也不需要 API key。安裝好 Claude Desktop 之後，下載一個檔案、點兩下就能開始。
+
+*English summary at the [end of this page](#english).*
 
 ![dashboard](docs/v2/evidence/pr20/dashboard-desktop.png)
 
-## How it works
+## 特色
 
-![architecture](docs/v2/architecture.png)
+- **兩段期間，直接看出過度擬合。** 每次回測都分成「策略開發期間」（用來設計與調整策略）與「策略執行期間」（模擬策略定稿後實際執行，不參與調整），兩段都與「買進並持有」並列比較。
+- **回測前先確認。** 第一次回測前，Claude 會逐題確認標的、策略、兩段期間、資金與費用，每題都附建議，回覆「yes」即可。
+- **結論有發現，也有洞察。** 定稿時，Claude 寫入一句總結與數組「發現與洞察」，涵蓋過度擬合、與買進並持有比較、盤勢（上漲段、盤整段、下跌段）與統計可信度。結論中的每個數字都會由程式驗證。
+- **dashboard 即時更新。** 以圖表為主，Claude 每完成一次回測，頁面幾秒內自動更新。
+- **台股資料內建。** 上市、上櫃股票與 ETF 共 2,324 檔，可以用中文名稱查詢，台股手續費與證交稅已內建。
 
-1. You describe a strategy idea to Claude Code.
-2. Claude writes `strategies/<name>.py` in your project folder.
-3. Claude calls the `run_backtest` MCP tool. The engine runs the strategy on daily bars from Yahoo Finance and saves the result in `.trader/runs.db`.
-4. Claude reports the numbers and a dashboard link. Every number comes from the engine, not from the model.
+## 安裝
 
-Interactive version of the diagram: [docs/v2/architecture.html](docs/v2/architecture.html).
+選擇一種方式即可。不會用終端機的話，請選方法一。
 
-## Install
+### 方法一：Claude Desktop（不需要終端機）
 
-Run these steps once, in order. Each step ends with a check. Do not continue until the check passes.
+1. 安裝並登入 [Claude Desktop](https://claude.ai/download)。
+2. 到 [Releases 頁面](https://github.com/jason8745/llm-agent-trader/releases/latest)，下載最新的 `llm-agent-trader-x.y.z.mcpb`。
+3. 點兩下下載的檔案，或把它拖進 Claude Desktop 視窗，在跳出的視窗按「安裝」。「研究資料夾」維持預設即可。
+4. 開一個新對話，輸入：
 
-### 1. Install uv
+   ```
+   開始使用台股回測
+   ```
 
-uv runs the Python side of this project. It also downloads Python 3.12 for you, so you do not need to install Python yourself.
+不需要另外安裝 Python 或其他軟體，Claude Desktop 會自動準備執行環境。第一次回測時，系統會下載回測引擎需要的元件，可能需要一至數分鐘；之後每次回測只要幾秒。
 
-```bash
-# macOS or Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
+### 方法二：Claude Code
 
-# Windows (PowerShell)
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-Homebrew users can run `brew install uv` instead. Open a new terminal afterwards, then check:
-
-```bash
-uv --version
-```
-
-### 2. Install Claude Code
-
-```bash
-# macOS or Linux
-curl -fsSL https://claude.ai/install.sh | bash
-
-# Windows (PowerShell)
-irm https://claude.ai/install.ps1 | iex
-```
-
-Homebrew users can run `brew install --cask claude-code` instead. Then run `claude` once and log in. Check:
-
-```bash
-claude --version
-```
-
-### 3. Install the plugin
+已經在使用 [Claude Code](https://code.claude.com) 的話，在終端機執行：
 
 ```bash
 claude plugin marketplace add jason8745/llm-agent-trader
 claude plugin install llm-agent-trader@llm-agent-trader
 ```
 
-The plugin adds the `trader` MCP tools and the research skill that tells Claude how to use them. Check:
+接著在任何資料夾啟動 `claude`，輸入 `/llm-agent-trader:start`，或直接說「開始使用台股回測」。
 
-```bash
-claude mcp list
-```
+需要先安裝 [uv](https://docs.astral.sh/uv/)：macOS 與 Linux 執行 `curl -LsSf https://astral.sh/uv/install.sh | sh`，Windows 在 PowerShell 執行 `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`。
 
-The output must include this line:
+## 第一次使用
 
-```
-plugin:llm-agent-trader:trader: uv run --no-project --python >=3.9 .../mcp_launcher.py - ✔ Connected
-```
+說「開始使用台股回測」之後，Claude 會依序：
 
-If Claude Code was already open during the install, restart it or run `/reload-plugins` in it.
+1. **徵求同意建立研究資料夾。** 位置是「文件 › trader-research」，用來存放策略檔與回測紀錄。你同意後才會建立。
+2. **確認工具可以使用。** 查詢「台積電」，確認回測工具正常。
+3. **開啟 dashboard。** 瀏覽器會自動開啟；沒有開啟時，點 Claude 回覆中的網址即可。
+4. **說明流程，並請你提出研究主題。** 例如：
 
-The first time a `trader` tool runs, uv downloads the Python libraries the engine needs (pandas, numpy, yfinance, about 50 MB). That first call takes one to a few minutes, depending on your network. Later calls take a few seconds.
+   > 我想研究台積電的趨勢追蹤策略。請使用 2023-01-01 至 2025-12-31 的資料，設計一個均線類策略並回測，至少迭代兩次，最後告訴我結論。
 
-## Use
+   > 請以 0050 測試 RSI 超賣進場、超買出場的策略，期間為 2020-01-01 至 2025-12-31，並與買進並持有基準比較。
 
-### 1. Start Claude Code in a project folder
+## 一次研究的流程
 
-```bash
-mkdir my-research && cd my-research
-claude
-```
+1. **確認五項研究條件。** Claude 會逐題列出，每題附建議答案，全部同意就回覆「yes」，要修改就註明題號：
+   1. 標的，例如 `2330.TW 台積電`。
+   2. 策略邏輯與初始參數。
+   3. 策略開發期間：用來設計與調整策略。
+   4. 策略執行期間：較晚的一段期間，模擬策略定稿後實際執行，以初始資金重新開始，不參與任何調整。預設為最後 12 個月。
+   5. 初始資金與費用：預設新臺幣 1,000,000 元與台股手續費、證交稅。
+2. **撰寫策略並回測。** Claude 撰寫策略並逐次回測，每次都寫明要驗證的假設。調整只依據策略開發期間的結果；策略執行期間的結果每次都會顯示，用來檢驗策略在沒參與調整的期間是否仍然有效。
+3. **定稿。** Claude 選出定稿的版本，寫入一句總結與數組「發現與洞察」：發現是有數字的事實，洞察說明這代表什麼、原因或下一步。
 
-Your strategies (`strategies/`) and backtest results (`.trader/runs.db`) are saved in this folder. Use one folder per research topic.
+完整的真實對話紀錄：[第一輪（確認研究條件）](docs/v2/evidence/pr20/claude-session-turn1.md)、[第二輪（回測與定稿）](docs/v2/evidence/pr20/claude-session-turn2.md)。
 
-### 2. Let Claude guide you (first time)
+## 看懂 dashboard
 
-Type this in Claude Code:
+- **左側：研究清單。** 依股票分組。一個「研究」是一檔股票、一個策略與兩段期間，底下列出每一次迭代。
+- **中間：圖表。** 上方是迭代切換、這次的假設與四個重點數字，下面是三張同步的圖：
+  - **K 線與成交量**：含買賣點、盤勢分段（上漲段紅、盤整段灰、下跌段綠）與策略執行期間起點。
+  - **累積報酬率**：策略與買進並持有的比較。策略執行期間以初始資金重新開始，所以曲線接在策略開發期間的終點往下畫；策略執行期間內曲線的漲跌幅，就等於策略執行期間的報酬率。
+  - **回撤**：策略從高點回落的幅度。
+  - 滑鼠移到圖上會顯示當天的數值。下方抽屜可展開成交明細、已平倉交易、最深回撤、盤勢分段表與策略原始碼。
+- **右側：結論。** 一句總結、兩段期間對照與過度擬合檢查、發現與洞察、各盤勢的表現。
 
-```
-/llm-agent-trader:start
-```
+dashboard 會跟著 Claude 的回測自動更新，不需要重新整理。之後想再打開，對 Claude 說「打開 dashboard」即可。
 
-You can also say 「第一次使用，請帶我開始」. Claude checks that the tools work, explains where your strategies and results are saved, opens the dashboard in your browser, explains the research flow, and suggests example requests.
+## 研究資料夾
 
-### 3. Describe what you want to study
+所有研究都存放在同一個資料夾，預設是「文件 › trader-research」（`~/Documents/trader-research`）：
 
-For example:
+- `strategies/`：策略檔。
+- `.trader/runs.db`：回測紀錄與結論。
 
-> 我想研究台積電的趨勢追蹤策略。請使用 2023-01-01 至 2025-12-31 的資料，設計一個均線類策略並回測，至少迭代兩次，最後告訴我結論。
+刪除這個資料夾就會刪除所有研究。要改放其他位置：Claude Desktop 在擴充功能設定中修改「研究資料夾」；Claude Code 設定環境變數 `TRADER_WORKSPACE`。
 
-Before the first backtest, Claude confirms five things with you as numbered questions, each with a recommended answer. Reply 「yes」 to accept all of them:
+## 常見問題
 
-1. The symbol, with its Chinese name (`2330.TW 台積電`).
-2. The strategy logic and its starting parameters.
-3. The development period (策略開發期間), used to design and tune the strategy.
-4. The execution period (策略執行期間), a later period that simulates running the finished strategy. It starts flat with fresh cash and is never used for tuning. By default it is the last 12 months.
-5. Starting cash and fees.
+**第一次回測為什麼比較久？** 第一次會下載回測引擎需要的元件（約 50 MB），視網路狀況需要一至數分鐘，之後只要幾秒。
 
-Claude asks for permission before it writes a file or calls a `trader` tool. Approve these requests. Claude then:
+**dashboard 沒有自動打開？** 點 Claude 回覆中 `http://127.0.0.1:8765/` 開頭的網址。
 
-1. Writes `strategies/<name>.py`.
-2. Calls `run_backtest` with a stated hypothesis for each iteration and tunes on the development period only. Both periods are always reported next to buy-and-hold, so a strategy that only worked on the data it was tuned on shows up immediately.
-3. Picks the final backtest and stores the conclusion with `finalize_study`: one verdict sentence plus 3 to 6 findings, each paired with an insight. Every number in the conclusion must appear in the tool output, or the tool refuses to store it.
+**Claude 說「研究資料夾尚未建立」？** 這是在等你同意，回覆「好」或「同意」即可。
 
-A full real session, from the confirmation questions to the stored conclusion, is in [docs/v2/evidence/pr20/claude-session-turn1.md](docs/v2/evidence/pr20/claude-session-turn1.md) and [claude-session-turn2.md](docs/v2/evidence/pr20/claude-session-turn2.md).
+**如何更新？** Claude Desktop：下載新版的 `.mcpb` 再安裝一次。Claude Code：執行 `claude plugin marketplace update llm-agent-trader` 與 `claude plugin update llm-agent-trader@llm-agent-trader`，再重新啟動 Claude Code。
 
-### 4. Open the dashboard
+**如何移除？** Claude Desktop：在設定的擴充功能中移除。Claude Code：執行 `claude plugin uninstall llm-agent-trader@llm-agent-trader`。研究資料夾不會被刪除。
 
-Ask Claude 「打開 dashboard」 at any time, and it opens the dashboard in your browser. Each backtest reply also ends with a link, for example `http://127.0.0.1:8765/runs/1`. The port is 8765 unless another project's dashboard already uses it, so prefer the link Claude gives you.
+**支援哪些股票？** 台灣上市、上櫃股票與 ETF 的日 K 資料，來源為 Yahoo Finance。只做多，以整股計算。
 
-Keep the dashboard open next to Claude Code. Each new backtest appears within a few seconds without a reload, and the page switches to it. If you open an older backtest, the page stays on it and only the list updates.
+**這是投資建議嗎？** 不是。回測結果只反映歷史資料，不代表未來績效。
 
-The dashboard is chart first:
+## 數字怎麼計算
 
-- **Left.** Your studies, grouped by stock. A study is one symbol, one strategy file and both periods, with every iteration listed under it.
-- **Center.** The iteration switcher, the hypothesis and four headline numbers, then three synchronized charts: candlesticks with volume, buy and sell markers and the market regimes; the cumulative return of the strategy against buy-and-hold; and the drawdown. Hover any chart to read that day's values. Fills, closed trades, the deepest drawdowns, the regime table and the strategy source are in the drawer below.
-- **Right.** The verdict, both periods side by side with the overfitting check, the findings and insights, and how the strategy did in each market regime.
+- **費用（台股）。** 手續費買賣各 0.1425%，最低新臺幣 20 元；證交稅股票 0.3%、ETF 0.1%；皆元以下捨去。
+- **股利。** 價格只做分割調整，不做股利調整；現金股利於除息日入帳，所以除息造成的價格下跌不會被算成虧損。
+- **成交。** 當天收盤產生訊號，隔一個交易日開盤成交。
+- **兩段期間。** 策略開發期間只使用自己的資料。策略執行期間從起日當天或之後的第一個交易日開始，以初始資金、空手開始，策略可以使用之前的資料計算指標。買進並持有在兩段期間以相同方式計算，報酬率都相對於初始資金。
+- **⚑ 過度擬合警示。** 策略開發期間的年化報酬率較策略執行期間高出逾 15 個百分點時顯示。
+- **盤勢分段。** 依固定規則分段：價格在 12% 區間內來回達 60 個交易日以上為盤整段；其餘期間以反轉 10% 判斷轉折，漲幅達 15% 為上漲段、跌幅達 15% 為下跌段，其餘為盤整段。
+- **單一格式化來源。** 工具、CLI 與 dashboard 顯示的每個數字都由 `trader.profit` 計算、`trader.fmt` 格式化，測試確保三處字串完全相同。
 
-The execution period restarts from fresh cash, so the cumulative return chart continues the execution curve from the end of the development curve. Inside the execution period, the rise or fall of the curve equals the execution return exactly.
+完整定義見 [docs/v2/design.md](docs/v2/design.md) 第 4 節。
 
-The dashboard stops when Claude Code exits. Next time, start Claude Code in the same folder and ask it to open the dashboard again. Without Claude Code, run this in the project folder:
+## 策略的寫法
 
-```bash
-uvx --from git+https://github.com/jason8745/llm-agent-trader llm-agent-trader ui
-```
-
-It prints the address, for example `http://127.0.0.1:8765/`. Open it in a browser. Press Ctrl+C to stop it.
-
-## Update and uninstall
-
-```bash
-claude plugin marketplace update llm-agent-trader
-claude plugin update llm-agent-trader@llm-agent-trader
-
-claude plugin uninstall llm-agent-trader@llm-agent-trader
-claude plugin marketplace remove llm-agent-trader
-```
-
-Uninstalling leaves your project folders untouched, including `strategies/` and `.trader/`.
-
-## Strategy contract
+Claude 會替你撰寫策略，以下供想自己修改的人參考：
 
 ```python
-"""ma_cross: hold while the 10-day SMA is above the 20-day SMA, long only."""
+"""ma_cross：10 日均線高於 20 日均線時持有，僅做多。"""
 
 from trader import ta
 
@@ -173,52 +141,45 @@ def on_bar(hist, pos, p):
     return 1.0 if fast > slow else 0.0
 ```
 
-- `hist` holds the bars up to and including today: `open, high, low, close, volume, dividend`. The strategy cannot see tomorrow. In the execution period `hist` also holds the earlier bars, so indicators are already warmed up.
-- The return value is the target position, from 0.0 to 1.0. It fills at the next day's open, and the position changes only when the returned target changes.
-- `trader.ta` provides `sma`, `ema`, `rsi`, `macd`, `bbands`, and `atr` with TA-Lib conventions. Indicators compose, for example `ta.ema(ta.rsi(hist.close, 14), 5)`.
+- `hist`：截至當天收盤的日 K（`open, high, low, close, volume, dividend`），看不到未來的資料。
+- 回傳值是目標持倉比例（0.0 至 1.0），隔一個交易日開盤成交，只有回傳值改變時才調整部位。
+- `trader.ta` 提供 `sma`、`ema`、`rsi`、`macd`、`bbands`、`atr`，慣例與 TA-Lib 一致，可以互相組合，例如 `ta.ema(ta.rsi(hist.close, 14), 5)`。
 
-## How the numbers are computed
+## 進階：命令列
 
-- **Fees (Taiwan).** Commission is 0.1425% on both sides with a NT$20 minimum. Sell tax is 0.3% for stocks and 0.1% for ETFs. Both are floored to whole NT$. Other markets default to zero fees.
-- **Dividends.** Prices are split-adjusted, not dividend-adjusted. Cash dividends are credited on the ex-date, so an ex-dividend drop is not counted as a loss.
-- **Two periods.** The development period runs on its own bars only. The execution period starts flat with the initial cash at the first trading day on or after its start date; the strategy may use every earlier loaded bar as history. Buy-and-hold is computed for each period the same way, and each period's returns are measured against the initial cash.
-- **⚑ overfit flag.** It shows when the annualized development return exceeds the annualized execution return by more than 15 points.
-- **Market regimes.** The closes of all loaded bars are split by fixed rules into up, down and range legs, and the strategy's return and time in the market are reported per leg.
-- **One formatter.** Every number shown by the tools, the CLI, and the dashboard comes from `trader.profit` and is rendered by `trader.fmt`. Tests enforce identical strings across all three.
-
-Full definitions are in [docs/v2/design.md](docs/v2/design.md) section 4.
-
-## CLI
-
-The same features work without Claude Code. Run these in a project folder, prefixed with `uvx --from git+https://github.com/jason8745/llm-agent-trader`:
+不透過 Claude 也能使用，指令作用在研究資料夾：
 
 ```bash
-llm-agent-trader search 台積電
-llm-agent-trader backtest ma_cross 2330.TW 2023-01-01 2024-12-31 2025-01-01 2025-12-31 --hypothesis "..."
-llm-agent-trader runs
-llm-agent-trader show 1
-llm-agent-trader ui
-llm-agent-trader mcp
+uvx --from git+https://github.com/jason8745/llm-agent-trader llm-agent-trader search 台積電
+uvx --from git+https://github.com/jason8745/llm-agent-trader llm-agent-trader backtest ma_cross 2330.TW 2023-01-01 2024-12-31 2025-01-01 2025-12-31 --hypothesis "..."
+uvx --from git+https://github.com/jason8745/llm-agent-trader llm-agent-trader ui
 ```
 
-`backtest` reads `strategies/ma_cross.py` from the current folder. The four dates are the development start and end, then the execution start and end.
+其他指令：`runs`（列出回測）、`show <編號>`（顯示一次回測）、`mcp`（啟動 MCP server）。
 
-## Development
+## 開發
 
 ```bash
 git clone https://github.com/jason8745/llm-agent-trader && cd llm-agent-trader
 uv sync
-uv run pytest                      # TRADER_LIVE=1 also hits yfinance
-scripts/mutation_check.sh          # plants known engine bugs; each must fail the suite
-uv run --with ta-lib --with numpy python tests/fixtures/gen_talib_reference.py
+uv run pytest                         # TRADER_LIVE=1 會實際連線 yfinance
+scripts/mutation_check.sh             # 植入已知錯誤，每一個都必須讓測試失敗
+uv run python scripts/build_mcpb.py   # 產生 Claude Desktop 安裝檔 dist/*.mcpb
+uv run python scripts/gen_mcp_manifest.py
 uv run python scripts/build_stock_list.py
 ```
 
-To try local changes in Claude Code, start it with `claude --plugin-dir .` from the repo root.
+- 在 Claude Code 中試用本地修改：在 repo 根目錄執行 `claude --plugin-dir .`。
+- 研究流程與規則只有一份：`src/trader/guide.md`，由 MCP 工具 `get_research_guide` 提供給 Claude Desktop 與 Claude Code。
+- 決策紀錄：[docs/v2/decisions.tsv](docs/v2/decisions.tsv)；dashboard 的設計選項：[docs/v2/mockups/v3](docs/v2/mockups/v3)。
+- v1（呼叫 LLM endpoint 的回測器）封存在 [`archive/v1`](https://github.com/jason8745/llm-agent-trader/tree/archive/v1) 分支與 `v1` tag。
 
-- Decision log for the v2 build: [docs/v2/decisions.tsv](docs/v2/decisions.tsv)
-- v1 (an LLM-endpoint backtester) is archived on the [`archive/v1`](https://github.com/jason8745/llm-agent-trader/tree/archive/v1) branch and the `v1` tag.
+## English
 
-## License
+A Taiwan stock backtesting harness for Claude. You discuss a strategy in chat; Claude writes it, backtests it on a deterministic engine, and explains the result on a live dashboard. Every number is computed by the engine, never by the model. Each backtest has a development period for tuning and a later execution period that simulates live use, both compared with buy-and-hold, so overfitting is visible. Conclusions are stored as a verdict plus findings paired with insights, and every number in them is verified against the tool output.
 
-MIT. The dashboard bundles [TradingView Lightweight Charts](https://github.com/tradingview/lightweight-charts) 5.2.1 under the Apache License 2.0 (`src/trader/viewer/lightweight-charts.LICENSE`).
+Install: in Claude Desktop, download the `.mcpb` from [Releases](https://github.com/jason8745/llm-agent-trader/releases/latest) and double-click it, then say 「開始使用台股回測」. In Claude Code: `claude plugin marketplace add jason8745/llm-agent-trader` and `claude plugin install llm-agent-trader@llm-agent-trader`.
+
+## 授權
+
+MIT。dashboard 內含 [TradingView Lightweight Charts](https://github.com/tradingview/lightweight-charts) 5.2.1，採 Apache License 2.0（`src/trader/viewer/lightweight-charts.LICENSE`）。

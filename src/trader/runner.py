@@ -5,7 +5,6 @@ import datetime as dt
 import hashlib
 import importlib.util
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -34,10 +33,6 @@ TIMEOUT_SECONDS = 60
 
 class RunError(Exception):
     pass
-
-
-def workspace() -> Path:
-    return Path(os.environ.get("TRADER_WORKSPACE") or os.getcwd()).resolve()
 
 
 def resolve_strategy(ws: Path, strategy: str) -> Path:

@@ -6,24 +6,33 @@ from mcp_manifest.json, starts the real server in the background, and forwards e
 `tools/call` once the real server is ready. Tool calls have no 30-second limit, so the
 first call simply waits for the install.
 
-    uv run --no-project --python ">=3.9" src/trader/mcp_launcher.py
+    uv run --no-project --managed-python --python 3.12 src/trader/mcp_launcher.py
 """
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import workspace  # noqa: E402  (stdlib-only module shared with the real server)
+
+# Answered here without waiting for the real server, so the first exchange is instant.
+LOCAL = {"get_research_guide": workspace.guide, "setup_workspace": workspace.setup}
 
 
 def child_command():
     override = os.environ.get("TRADER_MCP_CHILD")
     if override:
         return json.loads(override)
-    return ["uvx", "--from", str(HERE.parents[1]), "llm-agent-trader", "mcp"]
+    # uv exports its own path as UV; Claude Desktop's bundled uv is not on PATH.
+    uv = os.environ.get("UV") or shutil.which("uv") or "uv"
+    root = str(HERE.parents[1])
+    return [uv, "tool", "run", "--managed-python", "--from", root, "llm-agent-trader", "mcp"]
 
 
 class Child:
@@ -144,6 +153,13 @@ class Front:
             result = {"tools": self.manifest["tools"]}
         elif method == "ping":
             result = {}
+        elif method == "tools/call" and msg.get("params", {}).get("name") in LOCAL:
+            text = LOCAL[msg["params"]["name"]]()
+            result = {
+                "content": [{"type": "text", "text": text}],
+                "structuredContent": {"result": text},
+                "isError": False,
+            }
         elif method == "tools/call":
             threading.Thread(
                 target=self.call_tool, args=(rid, msg.get("params", {})), daemon=True
