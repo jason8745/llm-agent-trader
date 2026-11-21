@@ -1,0 +1,14 @@
+{
+  "name": "llm-agent-trader",
+  "owner": {
+    "name": "jason8745",
+    "url": "https://github.com/jason8745"
+  },
+  "plugins": [
+    {
+      "name": "llm-agent-trader",
+      "source": "./",
+      "description": "Taiwan stock backtesting harness for Claude Code."
+    }
+  ]
+}

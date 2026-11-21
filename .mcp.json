@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "trader": {
+      "command": "uvx",
+      "args": ["--from", "${CLAUDE_PLUGIN_ROOT}", "llm-agent-trader", "mcp"]
+    }
+  }
+}
