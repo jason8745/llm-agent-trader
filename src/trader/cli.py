@@ -55,12 +55,12 @@ def main(argv: list[str] | None = None) -> None:
                 cash=args.cash,
             )
         except runner.RunError as e:
-            sys.exit(f"backtest failed: {e}")
+            sys.exit(f"回測失敗：{e}")
         print(fmt.run_text(run, VIEWER_PORT))
     elif args.cmd == "show":
         run = store.get(ws, args.run_id)
         if run is None:
-            sys.exit(f"no run #{args.run_id}")
+            sys.exit(f"查無回測 #{args.run_id}。")
         print(fmt.run_text(run, VIEWER_PORT))
     elif args.cmd == "runs":
         print(fmt.runs_markdown(store.list_runs(ws), store.list_studies(ws)))

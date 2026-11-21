@@ -249,23 +249,51 @@
       }
     },
     {
-      "description": "Mark one backtest as the final one of its study and store the conclusion (markdown).\n\n    Every number in the conclusion must appear verbatim in the tool output of some backtest\n    in the same study; otherwise nothing is stored and the missing numbers are listed.\n    Finalizing again overwrites the previous choice and conclusion.\n    ",
+      "description": "Mark one backtest as the final one of its study and store the conclusion.\n\n    verdict: one sentence stating whether the strategy is worth using and when.\n    findings: 3 to 6 items; each pairs a finding (a factual observation quoting tool numbers)\n    with an insight (what it means, why it happened, or what to do next).\n    Every number must appear verbatim in the tool output of some backtest in the same study;\n    otherwise nothing is stored and the missing numbers are listed. Finalizing again\n    overwrites the previous choice and conclusion.\n    ",
       "inputSchema": {
         "properties": {
           "run_id": {
             "title": "Run Id",
             "type": "integer"
           },
-          "conclusion": {
-            "title": "Conclusion",
+          "verdict": {
+            "title": "Verdict",
             "type": "string"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/$defs/Finding"
+            },
+            "title": "Findings",
+            "type": "array"
           }
         },
         "required": [
           "run_id",
-          "conclusion"
+          "verdict",
+          "findings"
         ],
         "type": "object",
+        "$defs": {
+          "Finding": {
+            "properties": {
+              "finding": {
+                "title": "Finding",
+                "type": "string"
+              },
+              "insight": {
+                "title": "Insight",
+                "type": "string"
+              }
+            },
+            "required": [
+              "finding",
+              "insight"
+            ],
+            "title": "Finding",
+            "type": "object"
+          }
+        },
         "title": "finalize_studyArguments"
       },
       "name": "finalize_study",

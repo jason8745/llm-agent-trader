@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import re
 import subprocess
@@ -109,26 +110,49 @@ def test_finalize_accepts_numbers_quoted_from_the_study(ws):
     dev_ret = fmt.pct(ra.dev.strategy.ret)  # from the first iteration's output
     exec_mdd = fmt.pct(rb.exec.strategy.mdd)
     trips = fmt.shares(rb.exec.trades.count)
-    text = (
-        f"**兩段期間的績效**：策略開發期間報酬率為 {dev_ret}，策略執行期間最大回撤為 "
-        f"{exec_mdd}，交易次數 {trips} 次；本研究以 2025 年以前的資料為準。"
-    )
-    out = mcp_server.finalize(ws, b.id, text, 8765)
+    verdict = "本策略僅適用於重視風險控制的情境。"
+    findings = [
+        {
+            "finding": f"策略開發期間報酬率為 {dev_ret}。",
+            "insight": "開發期間的表現是調整參數的唯一依據。",
+        },
+        {
+            "finding": f"策略執行期間最大回撤為 {exec_mdd}。",
+            "insight": "執行期間的風險須與買進並持有基準比較。",
+        },
+        {
+            "finding": f"策略執行期間交易次數 {trips} 次。",
+            "insight": "本研究以 2025 年以前的資料為準，交易次數少時統計可信度有限。",
+        },
+    ]
+    out = mcp_server.finalize(ws, b.id, verdict, findings, 8765)
     assert out.endswith(f"http://127.0.0.1:8765/studies/{b.study_key}"), out
     s = store.get_study(ws, b.study_key)
-    assert (s.final_run_id, s.conclusion) == (b.id, text) and s.finalized_at
-    again = mcp_server.finalize(ws, a.id, "改以第一次迭代定稿。", 8765)
+    assert s.final_run_id == b.id and s.finalized_at
+    assert json.loads(s.conclusion) == {"verdict": verdict, "findings": findings}
+    again = mcp_server.finalize(ws, a.id, "改以第一次迭代定稿。", findings, 8765)
     assert "已將回測" in again and store.get_study(ws, a.study_key).final_run_id == a.id
 
 
 def test_finalize_rejects_invented_numbers_and_stores_nothing(ws):
     a, _ = first_study(ws)
     real = fmt.pct(a.report.dev.strategy.ret)
-    out = mcp_server.finalize(
-        ws, a.id, f"報酬率為 {real}，年化約 +31.07%，期末權益 1,234,567。", 8765
-    )
+    ok = {"finding": f"報酬率為 {real}。", "insight": "依工具輸出引用。"}
+    bad = {"finding": "年化約 +31.07%。", "insight": "期末權益 1,234,567。"}
+    out = mcp_server.finalize(ws, a.id, "總結。", [ok, bad, ok], 8765)
     assert out.startswith("結論未寫入")
     assert "- +31.07%" in out and "- 1,234,567" in out and real not in out
     s = store.get_study(ws, a.study_key)
     assert s.final_run_id is None and s.conclusion is None and s.finalized_at is None
-    assert mcp_server.finalize(ws, 999, "x", 8765) == "查無回測 #999。"
+    assert mcp_server.finalize(ws, 999, "x", [ok] * 3, 8765) == "查無回測 #999。"
+
+
+def test_finalize_requires_paired_findings_and_insights(ws):
+    a, _ = first_study(ws)
+    pair = {"finding": "發現。", "insight": "洞察。"}
+    assert "總結不得為空白" in mcp_server.finalize(ws, a.id, " ", [pair] * 3, 8765)
+    assert "3 至 6 組" in mcp_server.finalize(ws, a.id, "總結。", [pair] * 2, 8765)
+    assert "3 至 6 組" in mcp_server.finalize(ws, a.id, "總結。", [pair] * 7, 8765)
+    missing = [pair, {"finding": "只有發現。", "insight": ""}, pair]
+    assert "第 2 組須同時包含" in mcp_server.finalize(ws, a.id, "總結。", missing, 8765)
+    assert store.get_study(ws, a.study_key).conclusion is None

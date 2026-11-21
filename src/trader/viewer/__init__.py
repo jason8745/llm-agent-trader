@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from trader import fmt, store
-from trader.profit import drawdown_curve
+from trader.profit import chained_returns, drawdown_curve
 
 STATIC = Path(__file__).parent
 FILES = {
@@ -124,15 +124,15 @@ def study_payload(workspace: Path, key: str) -> dict | None:
         "dev": fmt.span(study.dev_start, study.dev_end),
         "exec": fmt.span(study.exec_start, study.exec_end),
         "question": runs[0].hypothesis,
-        "conclusion": study.conclusion,
+        "conclusion": json.loads(study.conclusion) if study.conclusion else None,
         "finalized_at": study.finalized_at,
         "final_run_id": study.final_run_id,
         "iterations": iterations,
     }
 
 
-def _pnl(equity: list[float], cash: float) -> list[int]:
-    return [round(e - cash) for e in equity]
+def _pct(values: list[float]) -> list[float]:
+    return [round(x * 100, 2) for x in values]
 
 
 def _dd(equity: list[float], cash: float) -> list[float]:
@@ -174,10 +174,8 @@ def run_payload(workspace: Path, run_id: int) -> dict | None:
             **{c: bars[c] for c in ("open", "high", "low", "close", "volume")},
             "dev_dates": dev["dates"],
             "exec_dates": exe["dates"],
-            "pnl_dev": _pnl(dev["equity"], cash),
-            "pnl_exec": _pnl(exe["equity"], cash),
-            "bh_pnl_dev": _pnl(p["bh_dev"], cash),
-            "bh_pnl_exec": _pnl(p["bh_exec"], cash),
+            "cum": _pct(chained_returns(cash, dev["equity"], exe["equity"])),
+            "cum_bh": _pct(chained_returns(cash, p["bh_dev"], p["bh_exec"])),
             "dd_dev": _dd(dev["equity"], cash),
             "dd_exec": _dd(exe["equity"], cash),
             "markers": [

@@ -7,6 +7,7 @@ from bars import random_bars
 from trader.engine import NO_FEES, TW_STOCK_FEES, Ledger, RoundTrip, buy_and_hold, simulate
 from trader.profit import (
     Drawdown,
+    chained_returns,
     daily_returns,
     drawdown_curve,
     drawdowns,
@@ -197,3 +198,14 @@ def test_regime_table_golden():
 
 def test_drawdown_curve_starts_at_initial_cash():
     assert drawdown_curve(100, [90, 110, 99, 120]) == pytest.approx([-0.1, 0, -0.1, 0])
+
+
+def test_chained_returns_keep_each_period_return_exact():
+    cash = 1000.0
+    dev = [1000.0, 1100.0, 1200.0]  # development return +20%
+    exe = [900.0, 1080.0]  # execution restarts at 1000; return +8%
+    out = chained_returns(cash, dev, exe)
+    # dev: e/1000 - 1; exec: 1.2 * e/1000 - 1
+    assert out == pytest.approx([0.0, 0.1, 0.2, 0.08, 0.296])
+    # inside the execution period the move from its start equals the execution return
+    assert (1 + out[-1]) / (1 + out[2]) - 1 == pytest.approx(exe[-1] / cash - 1)

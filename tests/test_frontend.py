@@ -14,7 +14,9 @@ def test_group_digits_is_the_only_number_formatting_in_the_frontend():
     body = body[: body.index("\n}\n")]
     assert grouping in body
     uses = re.findall(r"groupDigits\(", APP)
-    assert len(uses) == 4, "groupDigits is defined once and used only by the three chart price formats"
+    assert len(uses) == 4, (
+        "groupDigits is defined once and used only by the three chart price formats"
+    )
     for line in APP.splitlines():
         if "groupDigits(v," in line:
             assert line.lstrip().startswith("const fmt"), line

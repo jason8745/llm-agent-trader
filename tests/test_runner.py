@@ -108,7 +108,7 @@ def test_reruns_are_bit_identical_and_fingerprinted(ws):
 
 def test_fingerprint_mismatch_is_rejected(ws, monkeypatch):
     monkeypatch.setattr(runner.data, "fingerprint", lambda _bars: "0" * 64)
-    with pytest.raises(runner.RunError, match="different bars"):
+    with pytest.raises(runner.RunError, match="價格資料與擷取的資料不一致"):
         run(ws)
 
 
@@ -124,7 +124,7 @@ def test_source_snapshot_survives_later_edits(ws):
 def test_param_overrides(ws):
     r = run(ws, params={"fast": 10})
     assert r.params == {"fast": 10, "slow": 20}
-    with pytest.raises(runner.RunError, match="unknown params"):
+    with pytest.raises(runner.RunError, match="未知的參數"):
         run(ws, params={"fsat": 10})
 
 
@@ -132,13 +132,13 @@ def test_fee_override(ws):
     r = run(ws, fee={"commission_rate": 0.0, "min_commission": 0})
     fills = r.payload["dev"]["fills"] + r.payload["exec"]["fills"]
     assert fills and all(f["commission"] == 0 for f in fills)
-    with pytest.raises(runner.RunError, match="unknown fee fields"):
+    with pytest.raises(runner.RunError, match="不支援的費用欄位"):
         run(ws, fee={"rate": 0})
 
 
 @pytest.mark.parametrize("hyp", ["", "   "])
 def test_hypothesis_is_required(ws, hyp):
-    with pytest.raises(runner.RunError, match="hypothesis is required"):
+    with pytest.raises(runner.RunError, match="必須填寫 hypothesis"):
         run(ws, hypothesis=hyp)
 
 
@@ -150,18 +150,18 @@ def test_strategy_exception_reports_its_line(ws):
 
 
 def test_invalid_return_and_missing_on_bar(ws):
-    with pytest.raises(runner.RunError, match="between 0 and 1"):
+    with pytest.raises(runner.RunError, match="0 到 1 之間"):
         run(ws, write(ws, "big", "def on_bar(hist, pos, p):\n    return 2\n"))
     with pytest.raises(runner.RunError, match="must define on_bar"):
         run(ws, write(ws, "empty", "X = 1\n"))
-    with pytest.raises(runner.RunError, match="not found"):
+    with pytest.raises(runner.RunError, match="找不到策略檔"):
         run(ws, "nope")
 
 
 def test_infinite_loop_times_out_and_next_run_works(ws):
     name = write(ws, "spin", "def on_bar(hist, pos, p):\n    while True:\n        pass\n")
     t0 = time.monotonic()
-    with pytest.raises(runner.RunError, match="did not finish within 2 seconds"):
+    with pytest.raises(runner.RunError, match="未在 2 秒內完成"):
         run(ws, name, timeout=2)
     assert time.monotonic() - t0 < 10
     assert run(ws).report.exec.trades.count >= 0

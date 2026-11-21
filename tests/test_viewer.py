@@ -13,7 +13,7 @@ import pytest
 from conftest import BT, PERIODS, SYMBOL
 from mcp import Client, StdioServerParameters
 
-from trader import fmt, mcp_server, runner, store, viewer
+from trader import fmt, mcp_server, profit, runner, store, viewer
 
 HYP = "以 5 日與 20 日均線交叉作為基準策略。"
 
@@ -117,14 +117,10 @@ def test_run_payload_shape_and_chart(ws, served):
     c, p = d["chart"], run.payload
     assert c["dates"] == p["bars"]["date"] and c["close"] == p["bars"]["close"]
     assert c["dev_dates"] == p["dev"]["dates"] and c["exec_dates"] == p["exec"]["dates"]
-    for key, period, eq in [
-        ("pnl_dev", "dev", p["dev"]["equity"]),
-        ("pnl_exec", "exec", p["exec"]["equity"]),
-        ("bh_pnl_dev", "dev", p["bh_dev"]),
-        ("bh_pnl_exec", "exec", p["bh_exec"]),
-    ]:
-        assert c[key] == [round(e - run.cash) for e in eq]
-        assert len(c[key]) == len(c[f"{period}_dates"])
+    cash = run.cash
+    cum = profit.chained_returns(cash, p["dev"]["equity"], p["exec"]["equity"])
+    assert c["cum"] == [round(x * 100, 2) for x in cum]
+    assert len(c["cum"]) == len(c["cum_bh"]) == len(c["dev_dates"]) + len(c["exec_dates"])
     peak, dd = run.cash, []
     for e in p["exec"]["equity"]:
         peak = max(peak, e)
@@ -157,7 +153,9 @@ def test_tree_and_study_payloads(ws, served):
     other = runner.run_backtest(
         ws, "ma_cross", SYMBOL, PERIODS[0], PERIODS[1], "2024-04-15", PERIODS[3], "另一研究"
     )
-    mcp_server.finalize(ws, second.id, "以第二次迭代定稿。", 8765)
+    mcp_server.finalize(
+        ws, second.id, "以第二次迭代定稿。", [{"finding": "發現。", "insight": "洞察。"}] * 3, 8765
+    )
 
     tree = api(f"{served}/api/tree")
     assert [s["symbol"] for s in tree] == [SYMBOL] and tree[0]["label"] == fmt.symbol_label(SYMBOL)
@@ -181,7 +179,8 @@ def test_tree_and_study_payloads(ws, served):
     }
 
     st = api(f"{served}/api/studies/{first.study_key}")
-    assert st["conclusion"] == "以第二次迭代定稿。" and st["finalized_at"]
+    assert st["conclusion"]["verdict"] == "以第二次迭代定稿。" and st["finalized_at"]
+    assert st["conclusion"]["findings"] == [{"finding": "發現。", "insight": "洞察。"}] * 3
     assert st["final_run_id"] == second.id and st["label"] == fmt.symbol_label(SYMBOL)
     assert [i["diff"] for i in st["iterations"]] == ["首次回測", "fast 5→8", "參數未變更"]
     it = st["iterations"][1]

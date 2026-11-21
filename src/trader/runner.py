@@ -47,7 +47,7 @@ def resolve_strategy(ws: Path, strategy: str) -> Path:
         for path in (c, c.with_suffix(".py")):
             if path.is_file() and path.suffix == ".py":
                 return path.resolve()
-    raise RunError(f"strategy file not found: {strategy} (looked in {ws} and {ws / 'strategies'})")
+    raise RunError(f"找不到策略檔 {strategy}（已搜尋 {ws} 與 {ws / 'strategies'}）。")
 
 
 def _fees(symbol: str, override: dict | None) -> Fees:
@@ -57,7 +57,7 @@ def _fees(symbol: str, override: dict | None) -> Fees:
     known = {f.name for f in fields(Fees)}
     unknown = set(override) - known
     if unknown:
-        raise RunError(f"unknown fee fields {sorted(unknown)}; allowed: {sorted(known)}")
+        raise RunError(f"不支援的費用欄位 {sorted(unknown)}；可用欄位為 {sorted(known)}。")
     return replace(base, **override)
 
 
@@ -107,9 +107,9 @@ def run_backtest(
     loaded bars from exec_start on, starting flat with the initial cash; earlier bars (the
     development period and any gap before exec_start) are indicator history only."""
     if not hypothesis or not hypothesis.strip():
-        raise RunError("hypothesis is required: state what this run is testing")
+        raise RunError("必須填寫 hypothesis，說明本次回測驗證的假設。")
     if cash <= 0:
-        raise RunError(f"cash must be positive, got {cash}")
+        raise RunError(f"初始資金須為正數，收到 {cash}。")
     _periods(dev_start, dev_end, exec_start, exec_end)
     path = resolve_strategy(ws, strategy)
     symbol = symbol.strip().upper()
@@ -147,18 +147,16 @@ def run_backtest(
                 timeout=timeout,
             )
         except subprocess.TimeoutExpired as e:
-            raise RunError(f"strategy did not finish within {timeout:g} seconds") from e
+            raise RunError(f"策略未在 {timeout:g} 秒內完成。") from e
         result_file = Path(job["result_path"])
         if not result_file.exists():
-            raise RunError(
-                f"strategy process exited with code {proc.returncode}: {proc.stderr[-2000:]}"
-            )
+            raise RunError(f"策略程序異常結束（代碼 {proc.returncode}）：{proc.stderr[-2000:]}")
         result = json.loads(result_file.read_text())
     if "error" in result:
         raise RunError(result["error"])
     data_sha = data.fingerprint(bars)
     if result["data_sha"] != data_sha:
-        raise RunError("the strategy process read different bars than were fetched")
+        raise RunError("策略程序讀取的價格資料與擷取的資料不一致。")
 
     dev, exe = _ledger(result["dev"]), _ledger(result["exec"])
     bh_dev = buy_and_hold(bars.iloc[:dev_n], fees, cash)
@@ -218,7 +216,7 @@ def _child(job: dict) -> dict:
         base = dict(getattr(mod, "PARAMS", {}))
         unknown = set(job["params"]) - set(base)
         if unknown:
-            return {"error": f"unknown params {sorted(unknown)}; PARAMS defines {sorted(base)}"}
+            return {"error": f"未知的參數 {sorted(unknown)}；PARAMS 定義的參數為 {sorted(base)}。"}
         p = {**base, **job["params"]}
         bars = pd.read_csv(job["bars_csv"], index_col="date", parse_dates=["date"])
         fees = Fees(**job["fees"])

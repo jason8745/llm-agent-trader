@@ -133,6 +133,17 @@ def drawdown_curve(initial_cash: float, equity: list[float]) -> list[float]:
     return out
 
 
+def chained_returns(initial_cash: float, dev: list[float], exe: list[float]) -> list[float]:
+    """Cumulative return from the development start, one value per development and execution bar.
+
+    The execution period restarts from the initial cash, so its curve is chained to the
+    development end point: (1 + R_dev) * (E_t / initial cash) - 1. Inside the execution period
+    the change relative to its start therefore equals the execution return exactly.
+    """
+    base = dev[-1] / initial_cash
+    return [e / initial_cash - 1 for e in dev] + [base * e / initial_cash - 1 for e in exe]
+
+
 def metrics(led: Ledger) -> Metrics:
     e, d = led.equity, led.dates
     ret = e[-1] / led.initial_cash - 1

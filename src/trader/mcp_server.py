@@ -1,8 +1,10 @@
 """MCP tools over stdio. Every number in a tool result comes from trader.profit via trader.fmt."""
 
 import datetime as dt
+import json
 import os
 import webbrowser
+from typing import TypedDict
 
 from mcp.server import MCPServer
 
@@ -139,21 +141,41 @@ def list_runs(strategy: str | None = None, symbol: str | None = None) -> str:
     return fmt.runs_markdown(store.list_runs(ws, strategy, symbol), store.list_studies(ws))
 
 
-def finalize(ws, run_id: int, conclusion: str, port: int) -> str:
+MIN_FINDINGS, MAX_FINDINGS = 3, 6
+
+
+class Finding(TypedDict):
+    finding: str
+    insight: str
+
+
+def finalize(ws, run_id: int, verdict: str, findings: list, port: int) -> str:
     run = store.get(ws, run_id)
     if run is None:
         return f"查無回測 #{run_id}。"
-    if not conclusion or not conclusion.strip():
-        return "結論未寫入：結論分析不得為空白。"
+    verdict = (verdict or "").strip()
+    if not verdict:
+        return "結論未寫入：總結不得為空白。"
+    if not isinstance(findings, list) or not MIN_FINDINGS <= len(findings) <= MAX_FINDINGS:
+        return f"結論未寫入：發現與洞察須為 {MIN_FINDINGS} 至 {MAX_FINDINGS} 組。"
+    items = []
+    for i, f in enumerate(findings, 1):
+        finding = str((f or {}).get("finding", "")).strip() if isinstance(f, dict) else ""
+        insight = str((f or {}).get("insight", "")).strip() if isinstance(f, dict) else ""
+        if not finding or not insight:
+            return f"結論未寫入：第 {i} 組須同時包含發現（finding）與洞察（insight）。"
+        items.append({"finding": finding, "insight": insight})
+    text = "\n".join([verdict] + [f"{x['finding']}\n{x['insight']}" for x in items])
     corpus = "\n\n".join(fmt.run_detail(r, port) for r in store.list_runs(ws, study=run.study_key))
-    missing = list(dict.fromkeys(fmt.unverified_numbers(conclusion, corpus)))
+    missing = list(dict.fromkeys(fmt.unverified_numbers(text, corpus)))
     if missing:
         return (
             f"結論未寫入：下列數字未出現在研究 {run.study_key} 任何一次回測的工具輸出中，"
             "請依工具輸出原文引用後重新送出。\n" + "\n".join(f"- {n}" for n in missing)
         )
     at = dt.datetime.now(data.TAIPEI).strftime("%Y-%m-%d %H:%M")
-    store.finalize(ws, run.study_key, run.id, conclusion.strip(), at)
+    conclusion = json.dumps({"verdict": verdict, "findings": items}, ensure_ascii=False)
+    store.finalize(ws, run.study_key, run.id, conclusion, at)
     return (
         f"已將回測 #{run.id} 標記為研究 {run.study_key} 的定稿，並寫入結論分析。\n"
         f"檢視器：{fmt.study_url(run.study_key, port)}"
@@ -161,14 +183,17 @@ def finalize(ws, run_id: int, conclusion: str, port: int) -> str:
 
 
 @server.tool()
-def finalize_study(run_id: int, conclusion: str) -> str:
-    """Mark one backtest as the final one of its study and store the conclusion (markdown).
+def finalize_study(run_id: int, verdict: str, findings: list[Finding]) -> str:
+    """Mark one backtest as the final one of its study and store the conclusion.
 
-    Every number in the conclusion must appear verbatim in the tool output of some backtest
-    in the same study; otherwise nothing is stored and the missing numbers are listed.
-    Finalizing again overwrites the previous choice and conclusion.
+    verdict: one sentence stating whether the strategy is worth using and when.
+    findings: 3 to 6 items; each pairs a finding (a factual observation quoting tool numbers)
+    with an insight (what it means, why it happened, or what to do next).
+    Every number must appear verbatim in the tool output of some backtest in the same study;
+    otherwise nothing is stored and the missing numbers are listed. Finalizing again
+    overwrites the previous choice and conclusion.
     """
-    return finalize(_ws(), run_id, conclusion, _port())
+    return finalize(_ws(), run_id, verdict, findings, _port())
 
 
 @server.tool()
