@@ -2,3 +2,4 @@ ts	phase	decision	why	evidence	result
 2026-11-21T03:46:15Z	frame	依 design.md 第 5 節 Done means 作為完成條件，rigor 設為高	數字正確性錯誤會直接誤導交易判斷，屬單向門	docs/v2/design.md	open
 2026-11-21T03:46:15Z	archive	v1 封存為 archive/v1 分支與 v1 annotated tag，master 經由 PR 改為 v2	使用者要求保留舊版；以分支取代原先的 v2 分支方案，master 直接收斂到目標架構	branch archive/v1, tag v1 @68b2741	done
 2026-11-21T03:46:15Z	plan	PR 依序為 docs、刪除 v1 與骨架、engine/profit、資料層、MCP/CLI、檢視器、plugin/skill	先刪除再建構；先做有測試的純函式核心，再接外部邊界	docs/v2/design.md	open
+2026-11-21T03:49:40Z	scaffold	刪除 v1 全部程式碼（backend、frontend、Makefile、LLM 設定），建立 src/trader 套件與 CI	先刪除再建構，v1 已封存於 archive/v1，不需保留相容層	docs/v2/evidence/pr2/local-checks.log	ruff + pytest 通過
