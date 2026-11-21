@@ -1,7 +1,0 @@
-$ MCP_TIMEOUT=300000 claude mcp list   (empty uv cache, step 3 skipped)
-Checking MCP server health…
-
-plugin:llm-agent-trader:trader: uvx --from <fresh>/cfg/plugins/cache/llm-agent-trader/llm-agent-trader/2.0.0 llm-agent-trader mcp - ✔ Connected
-real 213.60
-user 3.26
-sys 2.54

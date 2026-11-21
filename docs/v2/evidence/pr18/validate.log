@@ -1,6 +1,0 @@
-  ❯ mcpServers: trader stdio uv ["run","--no-project","--python",">=3.9","${CLAUDE_PLUGIN_ROOT}/src/trader/mcp_launcher.py"]
-  ❯ skills: llm-agent-trader:start
-  ❯ skills: llm-agent-trader:trader
-Hosts not read for: mcpServers (1), skills (2)
-✔ These checks found nothing to report
-✔ Validation passed

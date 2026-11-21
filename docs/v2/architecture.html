@@ -1,228 +1,138 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agent Trader v2</title>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --color-paper: #f5f5f5; --color-ink: #2d3142; --color-muted: #4f5d75; --color-soft: #7a8399;
-      --color-accent: #eb6c36; --rule: rgba(45,49,66,0.12);
-      --font-sans: 'Geist', system-ui, sans-serif; --font-serif: 'Instrument Serif', serif; --font-mono: 'Geist Mono', ui-monospace, monospace;
-    }
-    body { font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink); padding: 3rem 2rem; }
-    .frame { max-width: 1100px; margin: 0 auto; }
-    .eyebrow { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
-    h1 { font-family: var(--font-serif); font-size: 2rem; font-weight: 400; letter-spacing: -0.02em; margin-bottom: 0.5rem; }
-    .sub { color: var(--color-muted); margin-bottom: 1.5rem; }
-    .scroll { overflow-x: auto; }
-    svg { width: 100%; min-width: 900px; display: block; }
-    .cards { display: grid; grid-template-columns: 1.1fr 1fr 0.9fr; gap: 1rem; margin-top: 2rem; }
-    .card { background: #fff; border: 1px solid var(--rule); border-radius: 6px; padding: 1.25rem; }
-    .card h3 { font-size: 0.95rem; margin: 0.25rem 0 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
-    .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
-    .card ul { padding-left: 1rem; color: var(--color-muted); font-size: 0.88rem; line-height: 1.6; }
-    code { font-family: var(--font-mono); font-size: 0.8em; }
-    footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--rule); font-family: var(--font-mono); font-size: 0.7rem; color: var(--color-soft); }
-    @media (max-width: 760px) { .cards { grid-template-columns: 1fr; } body { padding: 2rem 16px; } }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>llm-agent-trader 架構</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #f5f5f5; padding: 24px 16px; }
+  svg { display: block; width: 100%; max-width: 1100px; margin: 0 auto; }
+  .mono { font-family: 'Geist Mono', 'PingFang TC', monospace; }
+  .sans { font-family: 'Geist', 'PingFang TC', sans-serif; }
+</style>
 </head>
 <body>
-<div class="frame">
-  <p class="eyebrow">Architecture · llm-agent-trader v2</p>
-  <h1>Claude Code 是大腦，v2 是手</h1>
-  <p class="sub">v2 是一套 code harness：台股資料、MCP tools、回測引擎、損益模組串在一起。Claude 寫的策略直接跑在上面，回測迴圈裡沒有 LLM。</p>
+<svg id="arch" viewBox="0 76 1000 564" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t d">
+  <title id="t">llm-agent-trader 架構</title>
+  <desc id="d">使用者在 Claude Desktop 或 Claude Code 與 Claude 對話；Claude 經由 MCP 呼叫 launcher，launcher 立即回應研究規則與建立資料夾，並以 uv 啟動 MCP server；server 在子行程執行回測引擎，讀取台股資料與策略檔，結果寫入研究資料夾的 runs.db，dashboard 讀取並即時顯示。</desc>
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+    <marker id="ac" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+    <marker id="al" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+  </defs>
+  <rect width="100%" height="100%" fill="#f5f5f5"/>
 
-  <div class="scroll">
-  <svg viewBox="0 0 1000 680" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="arch-v2-title arch-v2-desc">
-    <title id="arch-v2-title">llm-agent-trader v2 architecture</title>
-    <desc id="arch-v2-desc">The user discusses strategy with Claude Code, which writes Python strategy files and calls the trader MCP server; the server spawns a deterministic backtest runner that reads the strategy, fetches yfinance data, and stores runs in SQLite for a read-only web viewer.</desc>
-    <defs>
-      <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
-      <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
-      <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
-    </defs>
-    <rect width="100%" height="100%" fill="#f5f5f5"/>
+  <!-- zones -->
+  <rect x="496" y="96" width="480" height="464" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+  <rect x="616" y="90" width="240" height="12" fill="#f5f5f5"/>
+  <text x="736" y="99" class="mono" fill="rgba(45,49,66,0.45)" font-size="8" text-anchor="middle" letter-spacing="0.14em">LLM-AGENT-TRADER · 本機執行</text>
+  <rect x="224" y="280" width="232" height="120" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-dasharray="4,3" stroke-width="0.8"/>
+  <rect x="256" y="274" width="168" height="12" fill="#f5f5f5"/>
+  <text x="340" y="283" class="mono" fill="rgba(45,49,66,0.45)" font-size="8" text-anchor="middle" letter-spacing="0.1em">研究資料夾 · 需使用者同意</text>
 
-    <!-- Zones -->
-    <rect x="224" y="108" width="232" height="292" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
-    <rect x="276" y="112" width="128" height="12" rx="2" fill="#f5f5f5"/>
-    <text x="340" y="121" fill="rgba(45,49,66,0.40)" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">YOUR WORKSPACE</text>
+  <!-- arrows -->
+  <line x1="184" y1="176" x2="244" y2="176" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#a)"/>
+  <rect x="190" y="156" width="52" height="12" fill="#f5f5f5"/>
+  <text x="216" y="165" class="mono" fill="#7a8399" font-size="8" text-anchor="middle">對話·卡片</text>
 
-    <rect x="496" y="108" width="464" height="452" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
-    <rect x="612" y="112" width="232" height="12" rx="2" fill="#f5f5f5"/>
-    <text x="728" y="121" fill="rgba(45,49,66,0.40)" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">HARNESS · LLM-AGENT-TRADER (UVX)</text>
+  <line x1="432" y1="176" x2="516" y2="176" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#ac)"/>
+  <rect x="444" y="156" width="64" height="12" fill="#f5f5f5"/>
+  <text x="476" y="165" class="mono" fill="#eb6c36" font-size="8" text-anchor="middle" letter-spacing="0.06em">MCP · STDIO</text>
 
-    <!-- Arrows (before nodes) -->
-    <!-- 1 user -> claude -->
-    <line x1="184" y1="176" x2="244" y2="176" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
-    <rect x="192" y="156" width="48" height="12" rx="2" fill="#f5f5f5"/>
-    <text x="216" y="165" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">DISCUSS</text>
+  <line x1="704" y1="176" x2="748" y2="176" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#a)"/>
+  <rect x="708" y="156" width="36" height="12" fill="#f5f5f5"/>
+  <text x="726" y="165" class="mono" fill="#7a8399" font-size="8" text-anchor="middle">uv run</text>
 
-    <!-- 2 claude -> strategies -->
-    <line x1="340" y1="212" x2="340" y2="300" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
-    <rect x="348" y="252" width="60" height="12" rx="2" fill="#f5f5f5"/>
-    <text x="352" y="261" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">WRITE .py</text>
+  <path d="M800,236 V256 Q800,264 792,264 H620 Q612,264 612,272 V300" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#a)"/>
+  <rect x="680" y="244" width="64" height="12" fill="#f5f5f5"/>
+  <text x="712" y="253" class="mono" fill="#7a8399" font-size="8" text-anchor="middle">子行程回測</text>
 
-    <!-- 3 claude -> mcp (focal) -->
-    <line x1="432" y1="176" x2="516" y2="176" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
-    <rect x="444" y="156" width="64" height="12" rx="2" fill="#f5f5f5"/>
-    <text x="476" y="165" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">MCP · STDIO</text>
+  <line x1="904" y1="236" x2="904" y2="300" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#a)"/>
+  <rect x="910" y="262" width="48" height="12" fill="#f5f5f5"/>
+  <text x="912" y="271" class="mono" fill="#7a8399" font-size="8">定稿·查詢</text>
 
-    <!-- 4 mcp -> runner -->
-    <line x1="612" y1="212" x2="612" y2="300" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
-    <rect x="620" y="252" width="40" height="12" rx="2" fill="#f5f5f5"/>
-    <text x="624" y="261" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">SPAWN</text>
+  <line x1="520" y1="340" x2="436" y2="340" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#a)"/>
+  <rect x="454" y="320" width="44" height="12" fill="#f5f5f5"/>
+  <text x="476" y="329" class="mono" fill="#7a8399" font-size="8" text-anchor="middle">import</text>
 
-    <!-- 5 runner -> strategies -->
-    <line x1="520" y1="340" x2="436" y2="340" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
-    <rect x="454" y="320" width="44" height="12" rx="2" fill="#f5f5f5"/>
-    <text x="476" y="329" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">IMPORT</text>
+  <line x1="704" y1="340" x2="748" y2="340" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#a)"/>
+  <rect x="710" y="320" width="32" height="12" fill="#f5f5f5"/>
+  <text x="726" y="329" class="mono" fill="#7a8399" font-size="8" text-anchor="middle">寫入</text>
 
-    <!-- 6 runner -> yfinance -->
-    <path d="M612,376 V488 Q612,496 604,496 H436" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
-    <rect x="620" y="424" width="40" height="12" rx="2" fill="#f5f5f5"/>
-    <text x="624" y="433" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">OHLCV</text>
+  <path d="M612,376 V488 Q612,496 604,496 H436" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#al)"/>
+  <rect x="618" y="424" width="40" height="12" fill="#f5f5f5"/>
+  <text x="622" y="433" class="mono" fill="#2e5aa8" font-size="8">日 K</text>
 
-    <!-- 7 runner -> runs.db -->
-    <line x1="704" y1="340" x2="748" y2="340" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
-    <rect x="712" y="320" width="32" height="12" rx="2" fill="#f5f5f5"/>
-    <text x="728" y="329" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">SAVE</text>
+  <line x1="856" y1="460" x2="856" y2="380" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#a)"/>
+  <rect x="862" y="412" width="56" height="12" fill="#f5f5f5"/>
+  <text x="864" y="421" class="mono" fill="#7a8399" font-size="8">每 2 秒讀取</text>
 
-    <!-- 8 mcp -> runs.db -->
-    <path d="M704,176 H836 Q844,176 844,184 V300" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
-    <rect x="748" y="156" width="40" height="12" rx="2" fill="#f5f5f5"/>
-    <text x="768" y="165" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">QUERY</text>
+  <path d="M112,212 V584 Q112,592 120,592 H848 Q856,592 856,584 V536" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#al)"/>
+  <rect x="420" y="572" width="128" height="12" fill="#f5f5f5"/>
+  <text x="484" y="581" class="mono" fill="#2e5aa8" font-size="8" text-anchor="middle">瀏覽器 127.0.0.1:8765</text>
 
-    <!-- 9 viewer -> runs.db -->
-    <line x1="844" y1="460" x2="844" y2="380" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
-    <rect x="852" y="412" width="36" height="12" rx="2" fill="#f5f5f5"/>
-    <text x="856" y="421" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">READ</text>
+  <!-- nodes -->
+  <rect x="40" y="140" width="144" height="72" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399"/>
+  <text x="112" y="172" class="sans" fill="#2d3142" font-size="12" font-weight="600" text-anchor="middle">你</text>
+  <text x="112" y="190" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">Claude Desktop</text>
+  <text x="112" y="202" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">或 Claude Code</text>
 
-    <!-- 10 user -> viewer -->
-    <path d="M112,212 V580 Q112,588 120,588 H836 Q844,588 844,580 V536" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
-    <rect x="428" y="568" width="104" height="12" rx="2" fill="#f5f5f5"/>
-    <text x="480" y="577" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">BROWSE /runs/:id</text>
+  <rect x="248" y="140" width="184" height="72" rx="6" fill="#fff" stroke="#2d3142"/>
+  <text x="340" y="172" class="sans" fill="#2d3142" font-size="12" font-weight="600" text-anchor="middle">Claude</text>
+  <text x="340" y="190" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">討論、撰寫策略、解讀結果</text>
+  <text x="340" y="202" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">不自行計算數字</text>
 
-    <!-- Nodes -->
-    <!-- User -->
-    <rect x="40" y="140" width="144" height="72" rx="6" fill="#f5f5f5"/>
-    <rect x="40" y="140" width="144" height="72" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
-    <rect x="48" y="148" width="32" height="12" rx="2" fill="none" stroke="rgba(122,131,153,0.5)" stroke-width="0.8"/>
-    <text x="64" y="157" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">USER</text>
-    <text x="112" y="184" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">You</text>
-    <text x="112" y="200" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">terminal + browser</text>
+  <rect x="520" y="140" width="184" height="72" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36"/>
+  <text x="612" y="172" class="sans" fill="#2d3142" font-size="12" font-weight="600" text-anchor="middle">launcher</text>
+  <text x="612" y="190" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">標準函式庫，立即回應</text>
+  <text x="612" y="202" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">研究規則 guide.md · 建立資料夾</text>
 
-    <!-- Claude Code -->
-    <rect x="248" y="140" width="184" height="72" rx="6" fill="#f5f5f5"/>
-    <rect x="248" y="140" width="184" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-    <rect x="256" y="148" width="40" height="12" rx="2" fill="none" stroke="rgba(45,49,66,0.4)" stroke-width="0.8"/>
-    <text x="276" y="157" fill="rgba(45,49,66,0.8)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AGENT</text>
-    <text x="340" y="184" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Claude Code</text>
-    <text x="340" y="200" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">+ trader plugin skill</text>
+  <rect x="752" y="140" width="208" height="96" rx="6" fill="#fff" stroke="#2d3142"/>
+  <text x="856" y="166" class="sans" fill="#2d3142" font-size="12" font-weight="600" text-anchor="middle">MCP server</text>
+  <text x="856" y="184" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">search_stock · get_ohlcv</text>
+  <text x="856" y="197" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">save_strategy · run_backtest</text>
+  <text x="856" y="210" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">get_run · list_runs</text>
+  <text x="856" y="223" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">finalize_study · open_dashboard</text>
 
-    <!-- strategies -->
-    <rect x="248" y="304" width="184" height="72" rx="6" fill="#f5f5f5"/>
-    <rect x="248" y="304" width="184" height="72" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
-    <rect x="256" y="312" width="40" height="12" rx="2" fill="none" stroke="rgba(79,93,117,0.4)" stroke-width="0.8"/>
-    <text x="276" y="321" fill="rgba(79,93,117,0.8)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">FILES</text>
-    <text x="340" y="348" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">strategies/*.py</text>
-    <text x="340" y="364" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">on_bar(hist, pos, p)</text>
+  <rect x="248" y="304" width="184" height="72" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75"/>
+  <text x="340" y="336" class="sans" fill="#2d3142" font-size="12" font-weight="600" text-anchor="middle">strategies/*.py</text>
+  <text x="340" y="354" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">on_bar(hist, pos, p)</text>
+  <text x="340" y="366" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">由 save_strategy 寫入</text>
 
-    <!-- MCP server (focal) -->
-    <rect x="520" y="140" width="184" height="72" rx="6" fill="#f5f5f5"/>
-    <rect x="520" y="140" width="184" height="72" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
-    <rect x="528" y="148" width="28" height="12" rx="2" fill="none" stroke="rgba(235,108,54,0.4)" stroke-width="0.8"/>
-    <text x="542" y="157" fill="rgba(235,108,54,0.9)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">MCP</text>
-    <text x="612" y="176" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">MCP server</text>
-    <text x="612" y="192" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">search_stock · get_ohlcv</text>
-    <text x="612" y="204" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">run_backtest · get_run · list_runs</text>
+  <rect x="520" y="304" width="184" height="72" rx="6" fill="#fff" stroke="#2d3142"/>
+  <text x="612" y="332" class="sans" fill="#2d3142" font-size="12" font-weight="600" text-anchor="middle">Engine + Profit</text>
+  <text x="612" y="350" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">收盤訊號、隔日開盤成交、台股費稅</text>
+  <text x="612" y="362" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">兩段期間 · 買進並持有 · 盤勢分段</text>
 
-    <!-- Runner -->
-    <rect x="520" y="304" width="184" height="72" rx="6" fill="#f5f5f5"/>
-    <rect x="520" y="304" width="184" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-    <rect x="528" y="312" width="32" height="12" rx="2" fill="none" stroke="rgba(45,49,66,0.4)" stroke-width="0.8"/>
-    <text x="544" y="321" fill="rgba(45,49,66,0.8)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">PROC</text>
-    <text x="612" y="344" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Engine + Profit</text>
-    <text x="612" y="360" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">on_bar · next-open fill</text>
-    <text x="612" y="372" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">fee+tax · IS / OOS / B&amp;H</text>
+  <rect x="752" y="304" width="208" height="72" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75"/>
+  <text x="856" y="336" class="sans" fill="#2d3142" font-size="12" font-weight="600" text-anchor="middle">runs.db</text>
+  <text x="856" y="354" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">SQLite · 研究資料夾/.trader</text>
+  <text x="856" y="366" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">回測、原始碼快照、定稿結論</text>
 
-    <!-- runs.db -->
-    <rect x="752" y="304" width="184" height="72" rx="6" fill="#f5f5f5"/>
-    <rect x="752" y="304" width="184" height="72" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
-    <rect x="760" y="312" width="24" height="12" rx="2" fill="none" stroke="rgba(79,93,117,0.4)" stroke-width="0.8"/>
-    <text x="772" y="321" fill="rgba(79,93,117,0.8)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">DB</text>
-    <text x="844" y="348" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">runs.db</text>
-    <text x="844" y="364" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">SQLite · source snapshot</text>
+  <rect x="248" y="460" width="184" height="72" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)"/>
+  <text x="340" y="492" class="sans" fill="#2d3142" font-size="12" font-weight="600" text-anchor="middle">台股資料</text>
+  <text x="340" y="510" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">yfinance .TW/.TWO · 本機快取</text>
+  <text x="340" y="522" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">內建 2,324 檔股票清單</text>
 
-    <!-- Viewer -->
-    <rect x="752" y="460" width="184" height="72" rx="6" fill="#f5f5f5"/>
-    <rect x="752" y="460" width="184" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
-    <rect x="760" y="468" width="24" height="12" rx="2" fill="none" stroke="rgba(45,49,66,0.4)" stroke-width="0.8"/>
-    <text x="772" y="477" fill="rgba(45,49,66,0.8)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">UI</text>
-    <text x="844" y="504" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Run viewer</text>
-    <text x="844" y="520" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">stdlib HTTP · static page</text>
+  <rect x="752" y="460" width="208" height="72" rx="6" fill="#fff" stroke="#2d3142"/>
+  <text x="856" y="492" class="sans" fill="#2d3142" font-size="12" font-weight="600" text-anchor="middle">Dashboard</text>
+  <text x="856" y="510" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">標準函式庫 HTTP · 靜態頁面</text>
+  <text x="856" y="522" class="mono" fill="#4f5d75" font-size="8" text-anchor="middle">K 線、累積報酬率、回撤、結論</text>
 
-    <!-- yfinance -->
-    <rect x="248" y="460" width="184" height="72" rx="6" fill="#f5f5f5"/>
-    <rect x="248" y="460" width="184" height="72" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
-    <rect x="256" y="468" width="28" height="12" rx="2" fill="none" stroke="rgba(45,49,66,0.3)" stroke-width="0.8"/>
-    <text x="270" y="477" fill="rgba(45,49,66,0.6)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EXT</text>
-    <text x="340" y="504" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">台股資料</text>
-    <text x="340" y="520" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">yfinance .TW/.TWO · 股票清單</text>
-
-    <!-- Legend -->
-    <line x1="40" y1="624" x2="960" y2="624" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
-    <text x="40" y="648" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
-    <rect x="120" y="640" width="16" height="12" rx="2" fill="rgba(235,108,54,0.08)" stroke="#eb6c36"/>
-    <text x="144" y="649" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">Agent entry point</text>
-    <rect x="248" y="640" width="16" height="12" rx="2" fill="#fff" stroke="#2d3142"/>
-    <text x="272" y="649" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">Process</text>
-    <rect x="336" y="640" width="16" height="12" rx="2" fill="rgba(45,49,66,0.05)" stroke="#4f5d75"/>
-    <text x="360" y="649" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">Store</text>
-    <rect x="412" y="640" width="16" height="12" rx="2" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)"/>
-    <text x="436" y="649" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">External</text>
-    <line x1="512" y1="646" x2="540" y2="646" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
-    <text x="548" y="649" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">Internal call</text>
-    <line x1="640" y1="646" x2="668" y2="646" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
-    <text x="676" y="649" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">Agent → MCP</text>
-    <line x1="764" y1="646" x2="792" y2="646" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
-    <text x="800" y="649" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace">Network / HTTP</text>
-  </svg>
-  </div>
-
-  <div class="cards">
-    <div class="card">
-      <p class="eyebrow">Loop</p>
-      <h3><span class="dot" style="background:#eb6c36"></span>研究迴圈</h3>
-      <ul>
-        <li>討論 → 寫 <code>strategies/x.py</code> → <code>run_backtest</code>（必填 hypothesis）</li>
-        <li>只看 IS 調參；OOS 只在定稿時看一次</li>
-        <li>回傳 run_id + 檢視器連結</li>
-      </ul>
-    </div>
-    <div class="card">
-      <p class="eyebrow">Engine</p>
-      <h3><span class="dot" style="background:#2d3142"></span>確定性回測</h3>
-      <ul>
-        <li><code>hist</code> 只給到當天，結構上不可能 look-ahead</li>
-        <li>收盤出訊號，隔日開盤成交，只做多</li>
-        <li>.TW 預設手續費 0.1425% + 證交稅 0.3%</li><li><code>search_stock("台積電")</code> → 2330.TW</li>
-      </ul>
-    </div>
-    <div class="card">
-      <p class="eyebrow">Deleted from v1</p>
-      <h3><span class="dot" style="background:#7a8399"></span>拿掉的東西</h3>
-      <ul>
-        <li><code>llm_strategy.py</code>（3501 行）</li>
-        <li>LLM client / API keys、SSE 串流</li>
-        <li>daily_feedback、retrospective endpoint</li>
-      </ul>
-    </div>
-  </div>
-  <footer>llm-agent-trader · v2 design draft · 2026-11-21</footer>
-</div>
+  <!-- legend -->
+  <line x1="40" y1="616" x2="960" y2="616" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+  <rect x="40" y="622" width="14" height="10" rx="2" fill="rgba(235,108,54,0.08)" stroke="#eb6c36"/>
+  <text x="60" y="630" class="mono" fill="#4f5d75" font-size="8">Claude 的進入點</text>
+  <rect x="150" y="622" width="14" height="10" rx="2" fill="#fff" stroke="#2d3142"/>
+  <text x="170" y="630" class="mono" fill="#4f5d75" font-size="8">程式</text>
+  <rect x="210" y="622" width="14" height="10" rx="2" fill="rgba(45,49,66,0.05)" stroke="#4f5d75"/>
+  <text x="230" y="630" class="mono" fill="#4f5d75" font-size="8">檔案</text>
+  <rect x="270" y="622" width="14" height="10" rx="2" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)"/>
+  <text x="290" y="630" class="mono" fill="#4f5d75" font-size="8">外部資料</text>
+  <line x1="350" y1="627" x2="374" y2="627" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#al)"/>
+  <text x="380" y="630" class="mono" fill="#4f5d75" font-size="8">網路 / HTTP</text>
+  <text x="960" y="630" class="mono" fill="#7a8399" font-size="8" text-anchor="end">回測迴圈內不呼叫 LLM；所有數字由 Engine + Profit 計算</text>
+</svg>
 </body>
 </html>

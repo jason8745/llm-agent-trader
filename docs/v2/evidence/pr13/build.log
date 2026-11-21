@@ -1,8 +1,0 @@
-$ uv build
-Building source distribution...
-Building wheel from source distribution...
-Successfully built <scratch>/rel/llm_agent_trader-2.0.0.tar.gz
-Successfully built <scratch>/rel/llm_agent_trader-2.0.0-py3-none-any.whl
-
-$ installed package version (uvx --no-cache --from . python)
-2.0.0

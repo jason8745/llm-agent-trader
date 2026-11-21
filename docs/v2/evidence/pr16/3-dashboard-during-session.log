@@ -1,5 +1,0 @@
-14:46:10 dashboard is up; opening it once, never reloading
-14:46:11 page now lists 1 run(s); detail shows #1; url=http://127.0.0.1:8765/
-14:46:16 page now lists 2 run(s); detail shows #2; url=http://127.0.0.1:8765/runs/2
-14:46:20 page now lists 3 run(s); detail shows #3; url=http://127.0.0.1:8765/runs/3
-14:46:30 final: 3 run(s) shown without any reload

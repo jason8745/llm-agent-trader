@@ -1,7 +1,0 @@
-empty state shown
-run #1 appeared after 1.8s, selected: 第 1 次 · fast=10, slow=20
-run #2 added to the iteration switcher after 1.8s, selected: 第 2 次 · fast=5, slow=20
-已將回測 #1 標記為研究 b5d395bc9d9c 的定稿，並寫入結論分析。
-page switched to the final iteration after 2.3s and shows 3 findings; url=http://127.0.0.1:62129/runs/1
-run #3 added to the list and switcher while the user stays on 第 1 次 (1.3s)
-page errors: none
