@@ -10,5 +10,20 @@
   "homepage": "https://github.com/jason8745/llm-agent-trader",
   "repository": "https://github.com/jason8745/llm-agent-trader",
   "license": "MIT",
-  "keywords": ["backtesting", "taiwan-stock", "trading", "mcp"]
+  "keywords": [
+    "backtesting",
+    "taiwan-stock",
+    "trading",
+    "mcp"
+  ],
+  "network": {
+    "hosts": [
+      "query1.finance.yahoo.com",
+      "query2.finance.yahoo.com",
+      "fc.yahoo.com",
+      "guce.yahoo.com",
+      "pypi.org",
+      "files.pythonhosted.org"
+    ]
+  }
 }
