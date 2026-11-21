@@ -181,5 +181,5 @@ def ensure_running(workspace: Path, port: int) -> int:
 
 def serve(workspace: Path, port: int) -> None:
     srv = make_server(workspace, port)
-    print(f"llm-agent-trader viewer: http://127.0.0.1:{port}/  (workspace {workspace})")
+    print(f"llm-agent-trader viewer: http://127.0.0.1:{port}/  (workspace {workspace})", flush=True)
     srv.serve_forever()

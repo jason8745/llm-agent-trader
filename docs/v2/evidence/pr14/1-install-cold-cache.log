@@ -1,0 +1,24 @@
+$ claude plugin marketplace add jason8745/llm-agent-trader
+Adding marketplace…SSH not configured, cloning via HTTPS: https://github.com/jason8745/llm-agent-trader.git
+Refreshing marketplace cache (timeout: 120s)…
+Cloning repository (timeout: 120s): https://github.com/jason8745/llm-agent-trader.git
+Clone complete, validating marketplace…
+Cleaning up old marketplace cache…
+✔ Successfully added marketplace: llm-agent-trader (declared in user settings)
+$ claude plugin install llm-agent-trader@llm-agent-trader
+Installing plugin "llm-agent-trader@llm-agent-trader"...✔ Successfully installed plugin: llm-agent-trader@llm-agent-trader (scope: user)
+$ claude plugin list
+Installed plugins:
+
+  ❯ llm-agent-trader@llm-agent-trader
+    Version: 2.0.0
+    Scope: user
+    Status: ✔ enabled
+
+$ time claude mcp list   (empty uv cache)
+Checking MCP server health…
+
+plugin:llm-agent-trader:trader: uvx --from <scratch>/fresh/cfg/plugins/cache/llm-agent-trader/llm-agent-trader/2.0.0 llm-agent-trader mcp - ✘ Failed to connect — MCP server "plugin:[redacted]:trader" connection timed out after 30000ms
+real 30.40
+user 0.76
+sys 0.50
