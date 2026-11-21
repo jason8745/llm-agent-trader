@@ -140,7 +140,7 @@ def simulate(
     last_target = initial_target
     entry_bar, trip_pnl = -1, 0.0
     dates = [d.strftime("%Y-%m-%d") for d in bars.index]
-    rows = bars[list(BAR_COLUMNS)].to_numpy(dtype=float)
+    rows = bars[list(BAR_COLUMNS)].to_numpy(dtype=float).tolist()
     n = len(rows)
 
     for t in range(n):

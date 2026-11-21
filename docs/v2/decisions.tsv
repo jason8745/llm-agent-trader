@@ -10,3 +10,5 @@ ts	phase	decision	why	evidence	result
 2026-11-21T03:57:27Z	review	獨立 reviewer（sonnet）審查數字邏輯：修正可負擔股數少 1 股與目標股數浮點誤差；駁回 RSI 平盤與除息日賣出兩點	RSI 平盤以 TA-Lib 實測為 50；除息日前一日收盤持有者有權領取股利，即使除息日開盤賣出	commit on v2/engine, tests test_buys_every_affordable_share / test_fractional_target_survives_float_noise	新測試舊碼紅、新碼綠
 2026-11-21T04:02:15Z	data	價格用 yfinance auto_adjust=False（僅還原分割），現金股利於除息日入帳	還原權值價會讓手續費以非實際成交價計算；原始價加股利入帳可同時保持費用正確與除息不計為虧損	docs/v2/evidence/pr4/real-data-run.log	2330.TW 三年 12 次除息，不變式全數成立
 2026-11-21T04:02:15Z	data	快取只保存結束日早於台北今日的區間	包含今日的資料可能尚未收盤或被修訂，快取會造成無法察覺的錯誤	tests/test_data.py test_ranges_touching_today_are_not_cached	tests green
+2026-11-21T04:09:22Z	profit	過擬合警示改為比較年化報酬率（偏離原定 Q12 的總報酬率差）	真實 2330.TW 回測中，樣本外 +48.10% 勝過買進並持有仍被標記；IS 約 2 年、OOS 約 10 個月，總報酬率不可直接比較	docs/v2/evidence/pr5/mcp-real-session.log, tests/test_engine.py test_overfit_flag_*	需使用者知悉
+2026-11-21T04:09:22Z	mcp	mcp 套件為 2.3.0，使用 MCPServer（FastMCP 已改名）	安裝最新版時發現 API 變動，依實際套件介面撰寫	src/trader/mcp_server.py	stdio 測試通過
