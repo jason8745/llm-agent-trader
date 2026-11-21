@@ -1,14 +1,14 @@
 # 台股回測 LLM Agent Trader
 
-![star](star-history-20251112.png)
-
 用聊天的方式研究台股策略。你說出想法，Claude 撰寫策略、回測、解讀結果，並在 dashboard 上即時呈現。每一個數字都由確定性的回測引擎計算，Claude 只負責討論與解讀，不自行計算。
 
 不需要寫程式，也不需要 API key。安裝好 Claude Desktop 之後，下載一個檔案、點兩下就能開始。
 
 *English summary at the [end of this page](#english).*
 
-![dashboard](docs/v2/evidence/pr20/dashboard-desktop.png)
+[![觀看 40 秒 demo](docs/images/demo-poster.jpg)](https://github.com/jason8745/llm-agent-trader/releases/download/v2.4.3/llm-agent-trader-demo.mp4)
+
+影片為一次真實的 Claude Code 操作：說「開始使用台股回測」、用選項卡片確認條件、用自己的話加上停損，Claude 自動實驗並定稿，dashboard 同步呈現結果。
 
 ## 特色
 
@@ -37,29 +37,35 @@
 
 ### 方法二：Claude Code
 
-已經在使用 [Claude Code](https://code.claude.com) 的話，在終端機執行：
+適合已經在使用 [Claude Code](https://code.claude.com) 的人。
 
-```bash
-claude plugin marketplace add jason8745/llm-agent-trader
-claude plugin install llm-agent-trader@llm-agent-trader
-```
+1. 安裝 [uv](https://docs.astral.sh/uv/)（已安裝可略過，用 `uv --version` 確認）：
+   - macOS、Linux：`curl -LsSf https://astral.sh/uv/install.sh | sh`
+   - Windows（PowerShell）：`powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
 
-接著在任何資料夾啟動 `claude`，輸入 `/llm-agent-trader:start`，或直接說「開始使用台股回測」。
+   安裝後請重新開啟終端機。
+2. 安裝 plugin：
 
-需要先安裝 [uv](https://docs.astral.sh/uv/)：macOS 與 Linux 執行 `curl -LsSf https://astral.sh/uv/install.sh | sh`，Windows 在 PowerShell 執行 `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`。
+   ```bash
+   claude plugin marketplace add jason8745/llm-agent-trader
+   claude plugin install llm-agent-trader@llm-agent-trader
+   ```
+
+3. 在任何資料夾啟動 `claude`，輸入 `/llm-agent-trader:start`，或直接說「開始使用台股回測」。
 
 ## 第一次使用
 
 說「開始使用台股回測」之後，Claude 會依序：
 
-1. **徵求同意建立研究資料夾。** 位置是「文件 › trader-research」，用來存放策略檔與回測紀錄。Claude 會用選項卡片詢問，點「建立研究資料夾」後才會建立。
-2. **確認工具可以使用。** 查詢「台積電」，確認回測工具正常。
-3. **開啟 dashboard。** 瀏覽器會自動開啟；沒有開啟時，點 Claude 回覆中的網址即可。
-4. **請你選擇研究主題。** 選項卡片會列出三個範例，也可以選「我有自己的想法」，直接打字說明，例如：
+1. **徵求同意建立研究資料夾。** 位置是「文件 › trader-research」，用來存放策略檔與回測紀錄。點選「建立研究資料夾」後才會建立，只會問這一次。
+2. **開啟 dashboard。** 瀏覽器會自動開啟；沒有開啟時，點 Claude 回覆中的網址即可。
+3. **請你選擇研究主題。** 選項卡片會列出三個範例；也可以選「我有自己的想法」，用一句話說明標的與策略，例如：
 
-   > 我想研究台積電的趨勢追蹤策略。請使用 2023-01-01 至 2025-12-31 的資料，設計一個均線類策略並回測，至少迭代兩次，最後告訴我結論。
+   > 我想研究台積電的均線趨勢策略，期間 2023 到 2025 年。
 
-   > 請以 0050 測試 RSI 超賣進場、超買出場的策略，期間為 2020-01-01 至 2025-12-31，並與買進並持有基準比較。
+   > 用 0050 測試 RSI 超賣進場、超買出場。
+
+   沒有提到的條件，Claude 會先提出建議，下一步再請你確認。
 
 ## 一次研究的流程
 
@@ -70,11 +76,17 @@ claude plugin install llm-agent-trader@llm-agent-trader
    4. 策略執行期間：較晚的一段期間，模擬策略定稿後實際執行，以初始資金重新開始，不參與任何調整。預設為最後 12 個月。
    5. 初始資金與費用：預設新臺幣 1,000,000 元與台股手續費、證交稅。
 2. **自動實驗。** 確認之後，Claude 會自己撰寫策略並連續做三到五次實驗，中途不再詢問。每次只改變一個條件，並寫明根據上一次結果提出的假設。調整只依據策略開發期間的結果；策略執行期間的結果每次都會顯示，用來檢驗策略在沒參與調整的期間是否仍然有效。想自己決定每一步的話，跟 Claude 說「每次實驗後先停下來問我」。
-3. **自動定稿。** 實驗完成後，Claude 選出策略開發期間表現最好的一次，寫入一句總結與數組「發現與洞察」：發現是有數字的事實，洞察說明這代表什麼、原因或下一步。最後附上實驗紀錄表與延伸研究的方向。
+3. **自動定稿。** 實驗完成後，Claude 選出策略開發期間表現最好的一次，寫入一句總結與數組「發現與洞察」：發現是有數字的事實，洞察說明這代表什麼、原因或下一步。最後附上實驗紀錄表，並用選項卡片提出延伸研究的方向。
 
-完整的真實對話紀錄：[第一輪（確認研究條件）](docs/v2/evidence/pr20/claude-session-turn1.md)、[第二輪（回測與定稿）](docs/v2/evidence/pr20/claude-session-turn2.md)。
+### 隨時調整
+
+- **確認條件時**：選「修改策略」「修改期間」或「修改標的或資金」，再點選具體選項；選項裡沒有的，選「Type something.」（Claude Desktop 為「其他」）直接打字，例如「均線交叉 20/60，再加上 8% 停損」。
+- **定稿之後**：點選延伸研究的選項，或直接說出想法，例如「把停損改成 12% 再研究一次」「換成聯發科試試看」。標的、策略或期間改變時會成為新的研究，dashboard 左側會多一筆。
+- **想看某一次結果**：說「打開第 3 次回測」，或在 dashboard 左側點選。
 
 ## 看懂 dashboard
+
+![dashboard](docs/images/dashboard.jpg)
 
 - **左側：研究清單。** 依股票分組。一個「研究」是一檔股票、一個策略與兩段期間，底下列出每一次迭代。
 - **中間：圖表。** 上方是迭代切換、這次的假設與四個重點數字，下面是三張同步的圖：
@@ -101,7 +113,7 @@ dashboard 會跟著 Claude 的回測自動更新，不需要重新整理。之�
 
 **dashboard 沒有自動打開？** 點 Claude 回覆中 `http://127.0.0.1:8765/` 開頭的網址。
 
-**Claude 說「研究資料夾尚未建立」？** 這是在等你同意，回覆「好」或「同意」即可。
+**Claude 說「研究資料夾尚未建立」？** 這是在等你同意，點選「建立研究資料夾」，或回覆「同意」即可。
 
 **如何更新？** Claude Desktop：下載新版的 `.mcpb` 再安裝一次。Claude Code：執行 `claude plugin marketplace update llm-agent-trader` 與 `claude plugin update llm-agent-trader@llm-agent-trader`，再重新啟動 Claude Code。
 
@@ -110,6 +122,12 @@ dashboard 會跟著 Claude 的回測自動更新，不需要重新整理。之�
 **支援哪些股票？** 台灣上市、上櫃股票與 ETF 的日 K 資料，來源為 Yahoo Finance。只做多，以整股計算。
 
 **這是投資建議嗎？** 不是。回測結果只反映歷史資料，不代表未來績效。
+
+## 運作方式
+
+![架構](docs/v2/architecture.png)
+
+Claude 只負責討論、撰寫策略與解讀結果；回測在本機的子行程中執行，迴圈內不呼叫 LLM。launcher 只用 Python 標準函式庫，第一次對話就能立即回應研究規則並建立資料夾，同時在背景以 uv 準備回測引擎。
 
 ## 數字怎麼計算
 
@@ -147,7 +165,7 @@ def on_bar(hist, pos, p):
 
 ## 進階：命令列
 
-不透過 Claude 也能使用，指令作用在研究資料夾：
+不透過 Claude 也能使用，指令作用在研究資料夾（需已建立；需要 uv）：
 
 ```bash
 uvx --from git+https://github.com/jason8745/llm-agent-trader llm-agent-trader search 台積電
@@ -171,12 +189,14 @@ uv run python scripts/build_stock_list.py
 
 - 在 Claude Code 中試用本地修改：在 repo 根目錄執行 `claude --plugin-dir .`。
 - 研究流程與規則只有一份：`src/trader/guide.md`，由 MCP 工具 `get_research_guide` 提供給 Claude Desktop 與 Claude Code。
-- 決策紀錄：[docs/v2/decisions.tsv](docs/v2/decisions.tsv)；dashboard 的設計選項：[docs/v2/mockups/v3](docs/v2/mockups/v3)。
+- 設計文件：[docs/v2/design.md](docs/v2/design.md)；決策紀錄：[docs/v2/decisions.tsv](docs/v2/decisions.tsv)。
 - v1（呼叫 LLM endpoint 的回測器）封存在 [`archive/v1`](https://github.com/jason8745/llm-agent-trader/tree/archive/v1) 分支與 `v1` tag。
 
 ## English
 
 A Taiwan stock backtesting harness for Claude. You discuss a strategy in chat; Claude writes it, backtests it on a deterministic engine, and explains the result on a live dashboard. Every number is computed by the engine, never by the model. Each backtest has a development period for tuning and a later execution period that simulates live use, both compared with buy-and-hold, so overfitting is visible. Conclusions are stored as a verdict plus findings paired with insights, and every number in them is verified against the tool output.
+
+Demo video (40 s, real session): [llm-agent-trader-demo.mp4](https://github.com/jason8745/llm-agent-trader/releases/download/v2.4.3/llm-agent-trader-demo.mp4).
 
 Install: in Claude Desktop, download the `.mcpb` from [Releases](https://github.com/jason8745/llm-agent-trader/releases/latest) and double-click it, then say 「開始使用台股回測」. In Claude Code: `claude plugin marketplace add jason8745/llm-agent-trader` and `claude plugin install llm-agent-trader@llm-agent-trader`.
 

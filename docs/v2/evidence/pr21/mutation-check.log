@@ -1,8 +1,0 @@
-KILLED    fill at close instead of next open
-KILLED    strategy sees tomorrow's bar
-KILLED    fees rounded instead of floored
-KILLED    minimum commission ignored
-KILLED    dividends not credited
-KILLED    execution starts one bar late
-KILLED    development sees execution bars
-KILLED    drawdown peak never rises

@@ -1,5 +1,0 @@
-plugin loaded: llm-agent-trader 2.2.0 llm-agent-trader@inline
-trader tools: get_ohlcv, get_run, list_runs, open_dashboard, run_backtest, search_stock
-tool call: ToolSearch {"query": "select:mcp__plugin_llm-agent-trader_trader__search_stock,mcp__plugin_llm-agent-trader_trader__open_dashboard", "max_results": 2}
-tool call: search_stock {"query": "台積電"}
-tool call: open_dashboard {}

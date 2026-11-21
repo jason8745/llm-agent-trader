@@ -1,6 +1,0 @@
-$ claude plugin marketplace update llm-agent-trader
-Updating marketplace: llm-agent-trader...Refreshing marketplace cache (timeout: 120s)…
-✔ Successfully updated marketplace: llm-agent-trader
-$ claude plugin update llm-agent-trader@llm-agent-trader
-Checking for updates for plugin "llm-agent-trader@llm-agent-trader"…
-✔ llm-agent-trader is already at the latest version (2.0.0).
