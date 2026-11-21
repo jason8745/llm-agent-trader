@@ -46,7 +46,14 @@ def test_mcp_tools_over_stdio(ws):
             ("list_runs", {}),
         ]
     )
-    assert tools == ["get_ohlcv", "get_run", "list_runs", "run_backtest", "search_stock"]
+    assert tools == [
+        "get_ohlcv",
+        "get_run",
+        "list_runs",
+        "open_dashboard",
+        "run_backtest",
+        "search_stock",
+    ]
     assert "2330.TW" in found and "台積電" in found
     run_id = int(re.search(r"回測 #(\d+)", result).group(1))
     run = store.get(ws, run_id)

@@ -143,3 +143,25 @@ def test_vendored_chart_library_is_pinned():
     assert hashlib.sha256(js).hexdigest() == (
         "e21cc5caa0226ef30bd8549c50b9ef926615f2a4ee6b4e486353477a55f598cf"
     )
+
+
+def test_open_dashboard_starts_the_viewer_before_any_backtest(ws, monkeypatch):
+    monkeypatch.setenv("TRADER_VIEWER_PORT", "18965")
+    monkeypatch.setenv("BROWSER", "true")
+    params = StdioServerParameters(
+        command=sys.executable, args=["-m", "trader.cli", "mcp"], env=dict(os.environ)
+    )
+
+    async def go():
+        async with Client(params) as client:
+            res = await client.call_tool("open_dashboard", {})
+            first = "".join(c.text for c in res.content if hasattr(c, "text"))
+            url = re.search(r"http://127\.0\.0\.1:\d+/", first).group(0)
+            listing = await asyncio.to_thread(api, url + "api/runs")
+            res = await client.call_tool("open_dashboard", {"run_id": 7})
+            missing = "".join(c.text for c in res.content if hasattr(c, "text"))
+            return first, listing, missing
+
+    first, listing, missing = asyncio.run(go())
+    assert listing == [] and "已在預設瀏覽器開啟" in first and "自動顯示" in first
+    assert "查無回測 #7" in missing

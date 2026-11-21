@@ -91,7 +91,17 @@ claude
 
 Your strategies (`strategies/`) and backtest results (`.trader/runs.db`) are saved in this folder. Use one folder per research topic.
 
-### 2. Describe what you want to study
+### 2. Let Claude guide you (first time)
+
+Type this in Claude Code:
+
+```
+/llm-agent-trader:start
+```
+
+You can also say 「第一次使用，請帶我開始」. Claude checks that the tools work, explains where your strategies and results are saved, opens the dashboard in your browser, explains the research flow, and suggests example requests.
+
+### 3. Describe what you want to study
 
 For example:
 
@@ -106,15 +116,15 @@ Claude asks for permission before it writes a file or calls a `trader` tool. App
 
 A full real session is in [docs/v2/evidence/pr7/claude-session.md](docs/v2/evidence/pr7/claude-session.md).
 
-### 3. Open the dashboard
+### 4. Open the dashboard
 
-The dashboard starts with the first backtest. Open the link in Claude's reply, for example `http://127.0.0.1:8765/runs/1`. The port is 8765 unless another project's dashboard already uses it, so prefer the link Claude gives you.
+Ask Claude 「打開 dashboard」 at any time, and it opens the dashboard in your browser. Each backtest reply also ends with a link, for example `http://127.0.0.1:8765/runs/1`. The port is 8765 unless another project's dashboard already uses it, so prefer the link Claude gives you.
 
 Keep the dashboard open next to Claude Code. Each new backtest appears within a few seconds without a reload, and the page switches to it. If you open an older run, the page stays on it and only the list updates.
 
 The dashboard lists every run in this folder. Each run shows the hypothesis, the in-sample, out-of-sample, and buy-and-hold results, a candlestick chart with buy and sell markers and the equity curve, the fills, the closed trades, and the strategy source.
 
-The dashboard stops when Claude Code exits. To open it again later, run this in the same project folder:
+The dashboard stops when Claude Code exits. Next time, start Claude Code in the same folder and ask it to open the dashboard again. Without Claude Code, run this in the project folder:
 
 ```bash
 uvx --from git+https://github.com/jason8745/llm-agent-trader llm-agent-trader ui
