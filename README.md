@@ -57,23 +57,7 @@ Homebrew users can run `brew install --cask claude-code` instead. Then run `clau
 claude --version
 ```
 
-### 3. Download the dependencies
-
-```bash
-uvx --from git+https://github.com/jason8745/llm-agent-trader llm-agent-trader search 台積電
-```
-
-The first run downloads Python and about 50 MB of libraries (pandas, numpy, yfinance, mcp). It took between 1.5 and 3.5 minutes in our tests, depending on the network. The check is a table with `2330.TW`:
-
-```
-| 代號 | 名稱 | 市場 | 類別 |
-|---|---|---|---|
-| 2330.TW | 台積電 | 上市 | 股票 |
-```
-
-Do not skip this step. Claude Code waits only 30 seconds for an MCP server to start, and the first download takes longer. After this step, the plugin starts in a few seconds.
-
-### 4. Install the plugin
+### 3. Install the plugin
 
 ```bash
 claude plugin marketplace add jason8745/llm-agent-trader
@@ -86,15 +70,15 @@ The plugin adds the `trader` MCP tools and the research skill that tells Claude 
 claude mcp list
 ```
 
-The check takes about 10 seconds. The output must include this line:
+The output must include this line:
 
 ```
-plugin:llm-agent-trader:trader: uvx --from ... llm-agent-trader mcp - ✔ Connected
+plugin:llm-agent-trader:trader: uv run --no-project --python >=3.9 .../mcp_launcher.py - ✔ Connected
 ```
-
-If it says `Failed to connect ... timed out`, the download in step 3 did not finish. Run step 3 again until it prints the table, then run `claude mcp list` again. On a slow network you can also give the server more time to start, for example `MCP_TIMEOUT=300000 claude` (five minutes).
 
 If Claude Code was already open during the install, restart it or run `/reload-plugins` in it.
+
+The first time a `trader` tool runs, uv downloads the Python libraries the engine needs (pandas, numpy, yfinance, about 50 MB). That first call takes one to a few minutes, depending on your network. Later calls take a few seconds.
 
 ## Use
 
@@ -124,7 +108,9 @@ A full real session is in [docs/v2/evidence/pr7/claude-session.md](docs/v2/evide
 
 ### 3. Open the dashboard
 
-While Claude Code is open, the dashboard runs automatically. Open the link at the end of Claude's reply, for example `http://127.0.0.1:8765/runs/1`. The port is 8765 unless another project's dashboard already uses it, so prefer the link Claude gives you.
+The dashboard starts with the first backtest. Open the link in Claude's reply, for example `http://127.0.0.1:8765/runs/1`. The port is 8765 unless another project's dashboard already uses it, so prefer the link Claude gives you.
+
+Keep the dashboard open next to Claude Code. Each new backtest appears within a few seconds without a reload, and the page switches to it. If you open an older run, the page stays on it and only the list updates.
 
 The dashboard lists every run in this folder. Each run shows the hypothesis, the in-sample, out-of-sample, and buy-and-hold results, a candlestick chart with buy and sell markers and the equity curve, the fills, the closed trades, and the strategy source.
 

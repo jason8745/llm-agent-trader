@@ -24,3 +24,5 @@ ts	phase	decision	why	evidence	result
 2026-11-21T04:31:59Z	verify	從 GitHub marketplace 以 local scope 安裝 plugin，於全新專案呼叫 search_stock	以使用者實際的安裝路徑驗證，而非僅用本地 --plugin-dir；驗證後移除安裝	docs/v2/evidence/final/install-from-github.log	0050.TW 元大台灣50
 2026-11-21T04:34:47Z	audit	決策紀錄由獨立 reviewer（sonnet）稽核；補上偷看策略無法獲利的測試、子行程資料指紋比對、lightweight-charts sha256 鎖定，並修正設計文件的安裝指令	Done means 對 look-ahead 的描述要求「偷看策略無法得利」；資料一致性改為執行期檢查而非僅靠測試	tests test_peeking_strategy_cannot_profit / test_vendored_chart_library_is_pinned; 故意改動子行程指紋時 9 個 runner 測試失敗	107 passed
 2026-11-21T04:34:47Z	audit	未發佈至 PyPI，安裝改以 git 來源與 plugin marketplace	發佈 PyPI 為對外且難以撤回的動作，留待使用者決定	docs/v2/design.md 第 5 節	需使用者決定
+2026-11-21T06:41:32Z	mcp	plugin 改由僅用標準函式庫的 mcp_launcher.py 啟動：立即回應 initialize 與 tools/list，背景啟動真正的 MCP server，tools/call 等待其就緒後轉送	首次以 uvx 安裝 pandas 等套件需 90 至 210 秒，超過 Claude Code 30 秒的 MCP 啟動上限；使用者要求安裝 plugin 後即可在 Claude 內互動，不需額外暖機步驟	tests/test_launcher.py；docs/v2/evidence/pr16	冷快取下連線成功
+2026-11-21T06:41:32Z	viewer	檢視器每 2 秒輪詢 /api/runs，有新回測時自動更新；使用者停留在最新一筆時跟隨切換，選了較舊的回測則只更新列表	使用者希望 dashboard 隨 Claude 內的互動自動變化；跟隨最新但不打斷使用者的選擇	docs/v2/evidence/pr16/live.log	新回測 1.8 秒內出現

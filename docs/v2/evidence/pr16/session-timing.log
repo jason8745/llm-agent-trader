@@ -1,0 +1,1 @@
+claude -p exit 0 after 242s with an empty uv cache (dependencies installed during the first tool call)

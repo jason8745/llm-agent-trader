@@ -1,0 +1,242 @@
+{
+  "serverInfo": {
+    "name": "llm-agent-trader",
+    "version": ""
+  },
+  "instructions": "Taiwan stock backtesting harness. You write strategies; the engine runs them.\n\nA strategy is a Python file (usually strategies/<name>.py) defining\n    PARAMS = {...}\n    def on_bar(hist, pos, p) -> float\nhist is a DataFrame of bars up to and including today (open, high, low, close, volume,\ndividend); pos is the current position as a fraction of equity; p is PARAMS merged with\noverrides. Return the target position, 0.0 to 1.0. It fills at the next day's open and only\nchanges when the returned target changes. Indicators: `from trader import ta`\n(sma, ema, rsi, macd, bbands, atr; they compose).\n\nEvery run reports in-sample (first 70%) and out-of-sample (last 30%) results next to\nbuy-and-hold. Tune on in-sample only. Quote numbers exactly as the tools return them.",
+  "tools": [
+    {
+      "description": "Find Taiwan stocks and ETFs by code or Chinese name, e.g. \"台積電\" or \"2330\".",
+      "inputSchema": {
+        "properties": {
+          "query": {
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object",
+        "title": "search_stockArguments"
+      },
+      "name": "search_stock",
+      "outputSchema": {
+        "properties": {
+          "result": {
+            "title": "Result",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "type": "object",
+        "title": "search_stockOutput"
+      }
+    },
+    {
+      "description": "Daily bars (YYYY-MM-DD dates, inclusive). Shows the last `limit` rows.",
+      "inputSchema": {
+        "properties": {
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "start": {
+            "title": "Start",
+            "type": "string"
+          },
+          "end": {
+            "title": "End",
+            "type": "string"
+          },
+          "limit": {
+            "default": 60,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "symbol",
+          "start",
+          "end"
+        ],
+        "type": "object",
+        "title": "get_ohlcvArguments"
+      },
+      "name": "get_ohlcv",
+      "outputSchema": {
+        "properties": {
+          "result": {
+            "title": "Result",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "type": "object",
+        "title": "get_ohlcvOutput"
+      }
+    },
+    {
+      "description": "Backtest a strategy file on one symbol over [start, end].\n\n    hypothesis (required): one sentence stating what this run tests, in formal written\n    language. params overrides keys in the strategy's PARAMS. fee overrides the default\n    fee schedule (commission_rate, min_commission, sell_tax_rate, floor_to_unit).\n    ",
+      "inputSchema": {
+        "properties": {
+          "strategy": {
+            "title": "Strategy",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "start": {
+            "title": "Start",
+            "type": "string"
+          },
+          "end": {
+            "title": "End",
+            "type": "string"
+          },
+          "hypothesis": {
+            "title": "Hypothesis",
+            "type": "string"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Params"
+          },
+          "cash": {
+            "default": 1000000,
+            "title": "Cash",
+            "type": "number"
+          },
+          "fee": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Fee"
+          }
+        },
+        "required": [
+          "strategy",
+          "symbol",
+          "start",
+          "end",
+          "hypothesis"
+        ],
+        "type": "object",
+        "title": "run_backtestArguments"
+      },
+      "name": "run_backtest",
+      "outputSchema": {
+        "properties": {
+          "result": {
+            "title": "Result",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "type": "object",
+        "title": "run_backtestOutput"
+      }
+    },
+    {
+      "description": "Full detail of one run: summary, fills, round trips, data fingerprint, source snapshot.",
+      "inputSchema": {
+        "properties": {
+          "run_id": {
+            "title": "Run Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run_id"
+        ],
+        "type": "object",
+        "title": "get_runArguments"
+      },
+      "name": "get_run",
+      "outputSchema": {
+        "properties": {
+          "result": {
+            "title": "Result",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "type": "object",
+        "title": "get_runOutput"
+      }
+    },
+    {
+      "description": "All runs in this workspace, oldest first, optionally filtered.",
+      "inputSchema": {
+        "properties": {
+          "strategy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Strategy"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Symbol"
+          }
+        },
+        "type": "object",
+        "title": "list_runsArguments"
+      },
+      "name": "list_runs",
+      "outputSchema": {
+        "properties": {
+          "result": {
+            "title": "Result",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "type": "object",
+        "title": "list_runsOutput"
+      }
+    }
+  ]
+}

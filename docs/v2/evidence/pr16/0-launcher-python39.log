@@ -1,0 +1,4 @@
+$ handshake under the system Python 3.9 (/usr/bin/python3)
+response id 1 keys ['protocolVersion', 'capabilities', 'serverInfo', 'instructions'] tools []
+response id 2 keys ['tools'] tools ['search_stock', 'get_ohlcv', 'run_backtest', 'get_run', 'list_runs']
+/usr/bin/python3 src/trader/mcp_launcher.py  0.02s user 0.01s system 69% cpu 0.042 total
