@@ -24,10 +24,29 @@ GLOSSARY = [
     "躺平",
     "抱著不動",
 ]
-# Colloquialisms observed in a real session before the skill gained rewrite examples.
-OBSERVED = ["方向對了", "多賺", "掉到", "越短越好", "適合誰", "錯過了", "不夠可靠"]
+# Colloquialisms observed in real sessions; each has a rewrite example in the skill.
+OBSERVED = [
+    "方向對了",
+    "多賺",
+    "掉到",
+    "越短越好",
+    "適合誰",
+    "錯過了",
+    "不夠可靠",
+    "一路上漲",
+    "追不上",
+    "輸給",
+    "代價很大",
+    "沒參與到",
+    "比較好",
+    "我做了",
+    "反而變差",
+    "想讓",
+]
 BANNED = GLOSSARY + OBSERVED
 NUMBER = re.compile(r"[+-]?\d[\d,]*(?:\.\d+)?%?")
+# A calendar year in prose ("2022 年") names a period, not a computed result.
+YEAR = re.compile(r"(?<![\d.,+-])\d{4}(?=\s*年)")
 
 
 def main(stream_path: str, out_path: str) -> int:
@@ -63,7 +82,7 @@ def main(stream_path: str, out_path: str) -> int:
     corpus = "\n".join(results)
     problems = []
     for p in prose:
-        for n in NUMBER.findall(p):
+        for n in NUMBER.findall(YEAR.sub("", p)):
             bare = n.lstrip("+")
             if n not in corpus and bare not in corpus and len(bare.strip("%")) > 1:
                 problems.append(f"number not found in any tool result: {n}")
