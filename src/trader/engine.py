@@ -132,8 +132,14 @@ def simulate(
     fees: Fees,
     initial_cash: float,
     initial_target: float | None = None,
+    start: int = 0,
 ) -> Ledger:
-    """Run decide over bars. initial_target, when set, is filled at bar 0's open."""
+    """Run decide over bars. initial_target, when set, is filled at bar start's open.
+
+    Bars before start are warm-up history only: nothing fills or is recorded there. The
+    ledger covers bars start..n-1 and its bar indices (Fill.bar, RoundTrip.entry_bar and
+    exit_bar) are relative to start.
+    """
     led = Ledger(initial_cash=initial_cash)
     cash, shares = float(initial_cash), 0
     pending = initial_target
@@ -142,8 +148,16 @@ def simulate(
     dates = [d.strftime("%Y-%m-%d") for d in bars.index]
     rows = bars[list(BAR_COLUMNS)].to_numpy(dtype=float).tolist()
     n = len(rows)
+    if not 0 <= start < n:
+        raise ValueError(f"start must be in [0, {n}), got {start}")
 
-    for t in range(n):
+    if start > 0:
+        # The decision at bar start-1's close, flat, fills at bar start's open.
+        target = _parse_target(decide(bars.iloc[:start].copy(), 0.0))
+        if target != last_target:
+            pending = last_target = target
+
+    for t in range(start, n):
         o, _, _, c, _, div = rows[t]
         date = dates[t]
 
@@ -160,7 +174,9 @@ def simulate(
             if target_shares < shares:
                 qty = shares - target_shares
                 gross = qty * o
-                f = Fill(t, date, "SELL", o, qty, gross, fees.commission(gross), fees.tax(gross))
+                f = Fill(
+                    t - start, date, "SELL", o, qty, gross, fees.commission(gross), fees.tax(gross)
+                )
                 released = led.cost_basis * qty / shares
                 gain = f.cash_delta - released
                 cash += f.cash_delta
@@ -172,13 +188,13 @@ def simulate(
                 if shares == 0:
                     led.cost_basis = 0.0
                     led.round_trips.append(
-                        RoundTrip(entry_bar, t, dates[entry_bar], date, trip_pnl)
+                        RoundTrip(entry_bar - start, t - start, dates[entry_bar], date, trip_pnl)
                     )
             elif target_shares > shares:
                 qty = min(target_shares - shares, _affordable_shares(cash, o, fees))
                 if qty > 0:
                     gross = qty * o
-                    f = Fill(t, date, "BUY", o, qty, gross, fees.commission(gross), 0.0)
+                    f = Fill(t - start, date, "BUY", o, qty, gross, fees.commission(gross), 0.0)
                     if shares == 0:
                         entry_bar, trip_pnl = t, 0.0
                     cash += f.cash_delta
@@ -201,5 +217,5 @@ def simulate(
     return led
 
 
-def buy_and_hold(bars: pd.DataFrame, fees: Fees, initial_cash: float) -> Ledger:
-    return simulate(bars, lambda _h, _p: 1.0, fees, initial_cash, initial_target=1.0)
+def buy_and_hold(bars: pd.DataFrame, fees: Fees, initial_cash: float, start: int = 0) -> Ledger:
+    return simulate(bars, lambda _h, _p: 1.0, fees, initial_cash, initial_target=1.0, start=start)

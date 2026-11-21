@@ -267,3 +267,85 @@ def test_peeking_strategy_cannot_profit():
         if closes[t + 1] > closes[t]:
             with_future *= closes[t + 1] / closes[t]
     assert with_future > 2, "the same rule with real future data would have been very profitable"
+
+
+# start: bars before start are warm-up history. Bars from 2025-01-01 (Wed):
+# 01-01, 01-02, 01-03, 01-06, 01-07; start=2 trades from 01-03.
+START_OPENS = [10, 11, 12, 13, 15]
+START_CLOSES = [10, 11, 12.5, 14, 16]
+
+
+def test_start_skips_warmup_and_fills_at_start_open():
+    bars = make_bars(START_OPENS, START_CLOSES)
+    seen = []
+
+    def decide(hist, pos):
+        seen.append((len(hist), hist.index[-1].strftime("%Y-%m-%d"), pos))
+        return {2: 1.0, 3: 1.0, 4: 0.0}[len(hist)]  # the first call needs both warm-up bars
+
+    led = simulate(bars, decide, NO_FEES, 1200, start=2)
+    # Decision at close of bar 1 sees bars 0..1 flat; later calls see the full history to t.
+    assert seen == [(2, "2025-01-02", 0.0), (3, "2025-01-03", 1.0), (4, "2025-01-06", 1.0)]
+    assert led.dates == ["2025-01-03", "2025-01-06", "2025-01-07"]
+    assert len(led.cash) == len(led.shares) == len(led.equity) == len(led.dividends) == 3
+    buy, sell = led.fills
+    # 1200 / 12 = 100 shares at bar 2's open; sold at bar 4's open 15 -> cash 1500
+    assert (buy.bar, buy.date, buy.price, buy.shares) == (0, "2025-01-03", 12.0, 100)
+    assert (sell.bar, sell.date, sell.price) == (2, "2025-01-07", 15.0)
+    assert led.equity == [1250, 1400, 1500]
+    (trip,) = led.round_trips
+    assert (trip.entry_bar, trip.exit_bar, trip.entry_date, trip.exit_date, trip.pnl) == (
+        0,
+        2,
+        "2025-01-03",
+        "2025-01-07",
+        300,
+    )
+
+
+def test_start_never_shows_the_future():
+    bars = random_bars(n=60)
+    start, lens = 20, []
+
+    def spy(hist, _pos):
+        lens.append(len(hist))
+        return 0.0
+
+    simulate(bars, spy, NO_FEES, 1e5, start=start)
+    # pre-loop call at close start-1, then t = start..n-2
+    assert lens == list(range(start, len(bars)))
+
+
+def test_start_zero_is_unchanged():
+    bars = random_bars(seed=5)
+
+    def run(**kw):
+        rng = np.random.default_rng(3)
+        return simulate(bars, lambda _h, _p: float(rng.choice([0, 1])), TW_STOCK_FEES, 1e6, **kw)
+
+    a, b = run(), run(start=0)
+    assert a.equity == b.equity and a.fills == b.fills and a.round_trips == b.round_trips
+
+
+def test_start_ledger_replays():
+    bars, start = random_bars(seed=2), 50
+    rng = np.random.default_rng(2)
+    led = simulate(
+        bars, lambda _h, _p: float(rng.choice([0, 0.5, 1])), TW_STOCK_FEES, 1e6, start=start
+    )
+    cash, shares = replay(bars.iloc[start:], led)
+    assert led.shares == shares and led.cash == pytest.approx(cash, abs=1e-6)
+    assert all(led.dates[f.bar] == f.date for f in led.fills)
+
+
+def test_buy_and_hold_with_start():
+    bars = make_bars(START_OPENS, START_CLOSES)
+    bh = buy_and_hold(bars, NO_FEES, 1200, start=2)
+    assert (bh.fills[0].bar, bh.fills[0].date, bh.fills[0].shares) == (0, "2025-01-03", 100)
+    assert bh.equity == [1250, 1400, 1600]
+
+
+@pytest.mark.parametrize("start", [-1, 5])
+def test_start_out_of_range(start):
+    with pytest.raises(ValueError):
+        simulate(make_bars(START_OPENS, START_CLOSES), lambda _h, _p: 0.0, NO_FEES, 1, start=start)
