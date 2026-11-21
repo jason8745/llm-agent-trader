@@ -40,7 +40,7 @@ function renderList() {
 }
 
 function renderEmpty() {
-  $("d").innerHTML = `<div class="empty"><p>尚無回測紀錄。</p><p>請在 Claude Code 中討論策略，並以 <code>run_backtest</code> 執行回測；完成後重新整理此頁面。</p></div>`;
+  $("d").innerHTML = `<div class="empty"><p>尚無回測紀錄。</p><p>請在 Claude Code 中討論策略，並以 <code>run_backtest</code> 執行回測；新的回測完成後，此頁面會自動顯示。</p></div>`;
 }
 
 function renderDetail() {
@@ -155,6 +155,22 @@ window.addEventListener("popstate", () => {
   const m = location.pathname.match(/^\/runs\/(\d+)$/);
   if (m) select(Number(m[1]), false);
 });
+
+// New runs appear without a reload. The view follows the newest run unless the user picked an older one.
+async function poll() {
+  const res = await fetch("/api/runs").catch(() => null);
+  if (!res || !res.ok) return;
+  const list = await res.json();
+  if (list.length === runs.length) return;
+  const following = !current || current.id === runs[runs.length - 1]?.id;
+  runs = list;
+  if (!following) return renderList();
+  const id = runs[runs.length - 1].id;
+  await select(id, false);
+  history.replaceState(null, "", `/runs/${id}`);
+}
+
+setInterval(poll, 2000);
 
 (async () => {
   const [info, list] = await Promise.all([fetch("/api/info").then((r) => r.json()), fetch("/api/runs").then((r) => r.json())]);

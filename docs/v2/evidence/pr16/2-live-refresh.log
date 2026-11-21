@@ -1,0 +1,4 @@
+page opened with no runs; empty state shown
+run #1 appeared without reload after 1.8s; url=http://127.0.0.1:56408/runs/1
+run #2 selected automatically after 1.8s; url=http://127.0.0.1:56408/runs/2
+run #3 added to the list after 1.8s while the user stays on #1 (#1); url=http://127.0.0.1:56408/runs/1

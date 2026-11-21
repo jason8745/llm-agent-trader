@@ -99,8 +99,12 @@ def test_ensure_running_reuses_own_viewer_and_skips_foreign_ones(tmp_path):
 
 def test_mcp_starts_viewer_for_its_links(ws, monkeypatch):
     monkeypatch.setenv("TRADER_VIEWER_PORT", "18865")
+    launcher = Path(viewer.__file__).parents[1] / "mcp_launcher.py"
+    child = json.dumps([sys.executable, "-m", "trader.cli", "mcp"])
     params = StdioServerParameters(
-        command=sys.executable, args=["-m", "trader.cli", "mcp"], env=dict(os.environ)
+        command=sys.executable,
+        args=[str(launcher)],
+        env=dict(os.environ, TRADER_MCP_CHILD=child),
     )
     args = {"strategy": "ma_cross", "symbol": SYMBOL, "start": START, "end": END, "hypothesis": HYP}
 
