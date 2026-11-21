@@ -1,0 +1,21 @@
+Validating marketplace manifest: <repo>/.claude-plugin/marketplace.json
+
+Provides:
+
+  ❯ mcpServers: trader stdio uvx ["--from","${CLAUDE_PLUGIN_ROOT}","llm-agent-trader","mcp"]
+  ❯ skills: llm-agent-trader:trader
+
+Hosts: fc.yahoo.com (declared), files.pythonhosted.org (declared), guce.yahoo.com (declared), pypi.org (declared), query1.finance.yahoo.com (declared), query2.finance.yahoo.com (declared)
+Hosts not read for: mcpServers (1), skills (1)
+
+Plugin directory checks for <repo>. The plugin directory is the catalog that plugins are submitted to; this is a subset of what it runs.
+
+About these checks:
+
+  ❯ This folder also holds a marketplace manifest. The plugin directory treats such a folder as a plugin, so these checks cover only the plugin in this folder. To check another plugin that the marketplace lists, run validate on that plugin's folder.
+
+✔ These checks found nothing to report
+
+The directory also runs a safety scan and a policy review that this command does not.
+
+✔ Validation passed
