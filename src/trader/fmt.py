@@ -5,16 +5,14 @@ import re
 from decimal import ROUND_HALF_UP, Decimal
 
 from trader.data import stock_name
-from trader.profit import Drawdown, Metrics, RegimeRow, StudyReport
+from trader.profit import Drawdown, Metrics, Period, RegimeRow, RegimeSummary, regime_summary
 from trader.regime import RANGE_BAND, RANGE_MIN_BARS, REVERSAL, TREND
 
 DASH = "—"
 UNRECOVERED = "尚未回復"
-DEV, EXEC = "策略開發期間", "策略執行期間"
-PERIOD_SHORT = {"dev": "開發期間", "exec": "執行期間"}
+PERIOD = "回測期間"
 SIDE = {"BUY": "買進", "SELL": "賣出"}
 REGIME_LABEL = {"up": "上漲段", "down": "下跌段", "range": "盤整段"}
-OVERFIT_NOTE = "⚑ 策略開發期間的年化報酬率較策略執行期間高出逾 15 個百分點，可能過度擬合。"
 REGIME_RULES = (
     f"盤勢分段依固定規則：價格在 {round(RANGE_BAND * 100)}% 區間內來回達 {RANGE_MIN_BARS} "
     f"個交易日以上為盤整段；其餘期間以反轉 {round(REVERSAL * 100)}% 判斷轉折，"
@@ -92,22 +90,12 @@ TRADES = [
 ]
 
 
-def metric_rows(r: StudyReport) -> list[dict]:
-    return [
-        {
-            "label": label,
-            "dev": f(r.dev.strategy),
-            "exec": f(r.exec.strategy),
-            "bh_dev": f(r.dev.bh),
-            "bh_exec": f(r.exec.bh),
-        }
-        for label, f in METRICS
-    ]
+def metric_rows(p: Period) -> list[dict]:
+    return [{"label": label, "strategy": f(p.strategy), "bh": f(p.bh)} for label, f in METRICS]
 
 
-def trade_rows(r: StudyReport) -> list[dict]:
-    d, e = r.dev.trades, r.exec.trades
-    return [{"label": label, "dev": f(d), "exec": f(e)} for label, f in TRADES]
+def trade_rows(p: Period) -> list[dict]:
+    return [{"label": label, "value": f(p.trades)} for label, f in TRADES]
 
 
 def regime_rows(rows: list[RegimeRow]) -> list[dict]:
@@ -117,6 +105,21 @@ def regime_rows(rows: list[RegimeRow]) -> list[dict]:
             "end": g.end,
             "kind": g.kind,
             "label": REGIME_LABEL[g.kind],
+            "bars": shares(g.bars),
+            "price_change": pct(g.price_change),
+            "strategy": pct(g.strategy),
+            "exposure": pct(g.exposure, signed=False),
+        }
+        for g in rows
+    ]
+
+
+def regime_summary_rows(rows: list[RegimeSummary]) -> list[dict]:
+    return [
+        {
+            "kind": g.kind,
+            "label": REGIME_LABEL[g.kind],
+            "segments": shares(g.segments),
             "bars": shares(g.bars),
             "price_change": pct(g.price_change),
             "strategy": pct(g.strategy),
@@ -142,7 +145,6 @@ def drawdown_rows(drawdowns: list[Drawdown]) -> list[dict]:
 def fill_rows(run) -> list[dict]:
     return [
         {
-            "period": PERIOD_SHORT[p],
             "date": f["date"],
             "side": SIDE[f["side"]],
             "buy": f["side"] == "BUY",
@@ -153,23 +155,20 @@ def fill_rows(run) -> list[dict]:
             "tax": money(f["tax"]),
             "fees": money(f["commission"] + f["tax"]),
         }
-        for p in ("dev", "exec")
-        for f in run.payload[p]["fills"]
+        for f in run.payload["ledger"]["fills"]
     ]
 
 
 def trip_rows(run) -> list[dict]:
     return [
         {
-            "period": PERIOD_SHORT[p],
             "entry": t["entry_date"],
             "exit": t["exit_date"],
             "held": shares(t["exit_bar"] - t["entry_bar"]),
             "pnl": money(t["pnl"], signed=True),
             "win": t["pnl"] > 0,
         }
-        for p in ("dev", "exec")
-        for t in run.payload[p]["round_trips"]
+        for t in run.payload["ledger"]["round_trips"]
     ]
 
 
@@ -196,27 +195,17 @@ def _table(header: list[str], align: str, rows: list[list[str]]) -> str:
     return "\n".join(lines + ["| " + " | ".join(r) + " |" for r in rows])
 
 
-def run_text(run, port: int) -> str:
-    r = run.report
-    head = [
-        f"回測 #{run.id} · 研究 {run.study_key} 第 {run.n} 次迭代 · {run.strategy} · {run.label}",
-        f"{DEV}：{span(run.dev_start, run.dev_end)}（{shares(r.dev.strategy.bars)} 個交易日）",
-        f"{EXEC}：{span(run.exec_start, run.exec_end)}（{shares(r.exec.strategy.bars)} 個交易日）",
-        f"假設：{run.hypothesis}",
-        f"參數：{params_text(run.params)}",
-    ]
-    metrics = _table(
-        ["指標", DEV, EXEC, "買進並持有（開發期間）", "買進並持有（執行期間）"],
-        ["---", "---:", "---:", "---:", "---:"],
-        [[m["label"], m["dev"], m["exec"], m["bh_dev"], m["bh_exec"]] for m in metric_rows(r)],
+def regimes_markdown(run) -> str:
+    summary = _table(
+        ["盤勢", "段數", "交易日", "股價漲跌幅", "策略報酬率", "持倉時間比例"],
+        ["---", "---:", "---:", "---:", "---:", "---:"],
+        [
+            [g["label"], g["segments"], g["bars"], g["price_change"], g["strategy"], g["exposure"]]
+            for g in regime_summary_rows(regime_summary(run.regimes))
+        ],
     )
-    trades = _table(
-        ["交易統計", DEV, EXEC],
-        ["---", "---:", "---:"],
-        [[t["label"], t["dev"], t["exec"]] for t in trade_rows(r)],
-    )
-    regimes = _table(
-        ["盤勢", "期間", "交易日", "價格變動", "策略報酬率", "持倉時間比例"],
+    segments = _table(
+        ["盤勢", "期間", "交易日", "股價漲跌幅", "策略報酬率", "持倉時間比例"],
         ["---", "---", "---:", "---:", "---:", "---:"],
         [
             [g["label"], span(g["start"], g["end"]), g["bars"], g["price_change"]]
@@ -224,11 +213,36 @@ def run_text(run, port: int) -> str:
             for g in regime_rows(run.regimes)
         ],
     )
-    parts = ["\n".join(head), metrics, trades]
-    if r.overfit:
-        parts.append(OVERFIT_NOTE)
-    parts += [f"盤勢分段\n{regimes}\n{REGIME_RULES}", f"檢視器：{viewer_url(run.id, port)}"]
-    return "\n\n".join(parts)
+    return f"盤勢彙總（同類各段連乘）\n{summary}\n\n盤勢分段\n{segments}\n{REGIME_RULES}"
+
+
+def run_text(run, port: int) -> str:
+    r = run.report
+    head = [
+        f"回測 #{run.id} · 研究 {run.study_key} 第 {run.n} 次迭代 · {run.strategy} · {run.label}",
+        f"{PERIOD}：{span(run.start, run.end)}（{shares(r.strategy.bars)} 個交易日）",
+        f"假設：{run.hypothesis}",
+        f"參數：{params_text(run.params)}",
+    ]
+    metrics = _table(
+        ["指標", "策略", "買進並持有"],
+        ["---", "---:", "---:"],
+        [[m["label"], m["strategy"], m["bh"]] for m in metric_rows(r)],
+    )
+    trades = _table(
+        ["交易統計", "策略"],
+        ["---", "---:"],
+        [[t["label"], t["value"]] for t in trade_rows(r)],
+    )
+    return "\n\n".join(
+        [
+            "\n".join(head),
+            metrics,
+            trades,
+            regimes_markdown(run),
+            f"檢視器：{viewer_url(run.id, port)}",
+        ]
+    )
 
 
 def drawdowns_markdown(drawdowns: list[Drawdown]) -> str:
@@ -249,10 +263,10 @@ def fills_markdown(run) -> str:
     if not rows:
         return "（無成交）"
     return _table(
-        ["期間", "日期", "方向", "價格", "股數", "成交金額", "手續費", "證交稅"],
-        ["---", "---", "---", "---:", "---:", "---:", "---:", "---:"],
+        ["日期", "方向", "價格", "股數", "成交金額", "手續費", "證交稅"],
+        ["---", "---", "---:", "---:", "---:", "---:", "---:"],
         [
-            [f["period"], f["date"], f["side"], f["price"], f["shares"], f["gross"]]
+            [f["date"], f["side"], f["price"], f["shares"], f["gross"]]
             + [f["commission"], f["tax"]]
             for f in rows
         ],
@@ -264,9 +278,9 @@ def round_trips_markdown(run) -> str:
     if not rows:
         return "（無已平倉交易）"
     return _table(
-        ["期間", "進場", "出場", "持有交易日", "已實現損益"],
-        ["---", "---", "---", "---:", "---:"],
-        [[t["period"], t["entry"], t["exit"], t["held"], t["pnl"]] for t in rows],
+        ["進場", "出場", "持有交易日", "已實現損益"],
+        ["---", "---", "---:", "---:"],
+        [[t["entry"], t["exit"], t["held"], t["pnl"]] for t in rows],
     )
 
 
@@ -276,8 +290,7 @@ def run_detail(run, port: int) -> str:
     return "\n\n".join(
         [
             run_text(run, port),
-            f"最深回撤（{DEV}）\n" + drawdowns_markdown(r.dev.drawdowns),
-            f"最深回撤（{EXEC}）\n" + drawdowns_markdown(r.exec.drawdowns),
+            "最深回撤\n" + drawdowns_markdown(r.drawdowns),
             "成交明細\n" + fills_markdown(run),
             "已平倉交易\n" + round_trips_markdown(run),
             f"資料指紋：{run.data_sha}\n策略原始碼 sha256：{run.source_sha}",
@@ -296,11 +309,7 @@ def runs_markdown(runs, studies: dict) -> str:
     for key, rs in groups.items():
         first, study = rs[0], studies.get(key)
         final = study.final_run_id if study else None
-        title = (
-            f"研究 {key} · {first.label} · {first.strategy} · "
-            f"{DEV} {span(first.dev_start, first.dev_end)} · "
-            f"{EXEC} {span(first.exec_start, first.exec_end)}"
-        )
+        title = f"研究 {key} · {first.label} · {first.strategy} · {PERIOD} {span(first.start, first.end)}"
         if final:
             title += f" · 定稿：回測 #{final}"
         rows = []
@@ -311,9 +320,9 @@ def runs_markdown(runs, studies: dict) -> str:
                     str(r.id),
                     str(r.n),
                     r.created_at,
-                    pct(rep.dev.strategy.ret),
-                    pct(rep.exec.strategy.ret) + (" ⚑" if rep.overfit else ""),
-                    pct(rep.exec.bh.ret),
+                    pct(rep.strategy.ret),
+                    pct(rep.bh.ret),
+                    pct(rep.strategy.mdd),
                     r.hypothesis + (" （定稿）" if r.id == final else ""),
                 ]
             )
@@ -325,9 +334,9 @@ def runs_markdown(runs, studies: dict) -> str:
                     "#",
                     "迭代",
                     "時間",
-                    "開發期間報酬率",
-                    "執行期間報酬率",
-                    "執行期間買進並持有",
+                    "報酬率",
+                    "買進並持有",
+                    "最大回撤",
                     "假設",
                 ],
                 ["---:", "---:", "---", "---:", "---:", "---:", "---"],

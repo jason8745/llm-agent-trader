@@ -26,10 +26,12 @@ from trader.engine import (
     fees_for,
     simulate,
 )
-from trader.profit import daily_returns, regime_table, study_report
+from trader.profit import daily_returns, period, regime_table
 
 DEFAULT_CASH = 1_000_000
 TIMEOUT_SECONDS = 60
+WARMUP_BARS = 60  # history before the start date, for indicators; not part of the results
+WARMUP_CALENDAR_DAYS = 130  # enough calendar days to cover WARMUP_BARS across holidays
 
 
 class RunError(Exception):
@@ -64,15 +66,11 @@ def _date(value: str, name: str) -> dt.date:
         raise RunError(f"{name}須為 YYYY-MM-DD 格式的日期，收到 {value!r}。") from e
 
 
-def _periods(dev_start: str, dev_end: str, exec_start: str, exec_end: str) -> None:
-    ds, de = _date(dev_start, "策略開發期間起日"), _date(dev_end, "策略開發期間迄日")
-    es, ee = _date(exec_start, "策略執行期間起日"), _date(exec_end, "策略執行期間迄日")
-    if ds > de:
-        raise RunError(f"策略開發期間起日 {dev_start} 晚於迄日 {dev_end}。")
-    if es > ee:
-        raise RunError(f"策略執行期間起日 {exec_start} 晚於迄日 {exec_end}。")
-    if de >= es:
-        raise RunError(f"策略執行期間起日 {exec_start} 須晚於策略開發期間迄日 {dev_end}。")
+def _period(start: str, end: str) -> dt.date:
+    s, e = _date(start, "回測期間起日"), _date(end, "回測期間迄日")
+    if s > e:
+        raise RunError(f"回測期間起日 {start} 晚於迄日 {end}。")
+    return s
 
 
 def _ledger(d: dict) -> Ledger:
@@ -89,37 +87,36 @@ def run_backtest(
     ws: Path,
     strategy: str,
     symbol: str,
-    dev_start: str,
-    dev_end: str,
-    exec_start: str,
-    exec_end: str,
+    start: str,
+    end: str,
     hypothesis: str,
     params: dict | None = None,
     cash: float = DEFAULT_CASH,
     fee: dict | None = None,
     timeout: float = TIMEOUT_SECONDS,
 ) -> store.Run:
-    """Development: the strategy on the development bars only. Execution: the strategy on all
-    loaded bars from exec_start on, starting flat with the initial cash; earlier bars (the
-    development period and any gap before exec_start) are indicator history only."""
+    """The strategy from the first bar on or after start, flat with the initial cash. Up to
+    WARMUP_BARS earlier bars are loaded as indicator history; they are charted but not traded
+    or measured."""
     if not hypothesis or not hypothesis.strip():
         raise RunError("必須填寫 hypothesis，說明本次回測驗證的假設。")
     if cash <= 0:
         raise RunError(f"初始資金須為正數，收到 {cash}。")
-    _periods(dev_start, dev_end, exec_start, exec_end)
+    first = _period(start, end)
     path = resolve_strategy(ws, strategy)
     symbol = symbol.strip().upper()
     fees = _fees(symbol, fee)
     try:
-        bars = data.load_bars(symbol, dev_start, exec_end)
+        loaded = (first - dt.timedelta(days=WARMUP_CALENDAR_DAYS)).isoformat()
+        bars = data.load_bars(symbol, loaded, end)
     except data.DataError as e:
         raise RunError(str(e)) from e
+    k = next((i for i, d in enumerate(bars.index) if d.strftime("%Y-%m-%d") >= start), len(bars))
+    bars = bars.iloc[max(0, k - WARMUP_BARS) :]
+    k = min(k, WARMUP_BARS)
     dates = [d.strftime("%Y-%m-%d") for d in bars.index]
-    dev_n = sum(dev_start <= d <= dev_end for d in dates)
-    k = next((i for i, d in enumerate(dates) if d >= exec_start), len(dates))
-    for name, n in (("策略開發期間", dev_n), ("策略執行期間", len(dates) - k)):
-        if n < 2:
-            raise RunError(f"{name}僅有 {n} 個交易日，至少需要 2 個交易日。")
+    if len(dates) - k < 2:
+        raise RunError(f"回測期間僅有 {len(dates) - k} 個交易日，至少需要 2 個交易日。")
 
     source = path.read_text(encoding="utf-8")
     with tempfile.TemporaryDirectory() as tmp:
@@ -128,8 +125,7 @@ def run_backtest(
             "params": params or {},
             "fees": asdict(fees),
             "cash": cash,
-            "dev_bars": dev_n,
-            "exec_start": k,
+            "start": k,
             "bars_csv": str(Path(tmp) / "bars.csv"),
             "result_path": str(Path(tmp) / "result.json"),
         }
@@ -156,25 +152,21 @@ def run_backtest(
     if result["data_sha"] != data_sha:
         raise RunError("策略程序讀取的價格資料與擷取的資料不一致。")
 
-    dev, exe = _ledger(result["dev"]), _ledger(result["exec"])
-    bh_dev = buy_and_hold(bars.iloc[:dev_n], fees, cash)
-    bh_exec = buy_and_hold(bars, fees, cash, start=k)
-    gap = k - dev_n  # bars after dev_end and before exec_start: history for execution only
-    close = bars["close"].tolist()
+    led = _ledger(result["ledger"])
+    bh = buy_and_hold(bars, fees, cash, start=k)
+    close = bars["close"].tolist()[k:]
     regimes = regime_table(
-        dates,
+        dates[k:],
         close,
         regime.segment(close),
-        daily_returns(dev) + [0.0] * gap + daily_returns(exe),
-        [s > 0 for s in dev.shares] + [False] * gap + [s > 0 for s in exe.shares],
+        daily_returns(led),
+        [s > 0 for s in led.shares],
     )
     payload = {
         "bars": {"date": dates, **{c: bars[c].tolist() for c in BAR_COLUMNS}},
-        "dev": result["dev"],
-        "exec": result["exec"],
-        "bh_dev": bh_dev.equity,
-        "bh_exec": bh_exec.equity,
-        "report": asdict(study_report(dev, bh_dev, exe, bh_exec)),
+        "ledger": result["ledger"],
+        "bh": bh.equity,
+        "report": asdict(period(led, bh)),
         "regimes": [asdict(r) for r in regimes],
     }
     return store.insert(
@@ -182,10 +174,8 @@ def run_backtest(
         created_at=dt.datetime.now(data.TAIPEI).strftime("%Y-%m-%d %H:%M"),
         strategy=path.stem,
         symbol=symbol,
-        dev_start=dev_start,
-        dev_end=dev_end,
-        exec_start=exec_start,
-        exec_end=exec_end,
+        start=start,
+        end=end,
         hypothesis=hypothesis.strip(),
         params=result["params"],
         cash=cash,
@@ -219,13 +209,11 @@ def _child(job: dict) -> dict:
         bars = pd.read_csv(job["bars_csv"], index_col="date", parse_dates=["date"])
         fees = Fees(**job["fees"])
         decide = lambda h, pos: mod.on_bar(h, pos, p)  # noqa: E731
-        dev = simulate(bars.iloc[: job["dev_bars"]], decide, fees, job["cash"])
-        exe = simulate(bars, decide, fees, job["cash"], start=job["exec_start"])
+        led = simulate(bars, decide, fees, job["cash"], start=job["start"])
     except Exception as e:
         return {"error": _strategy_error(e, path)}
     return {
-        "dev": asdict(dev),
-        "exec": asdict(exe),
+        "ledger": asdict(led),
         "params": p,
         "data_sha": data.fingerprint(bars),
     }

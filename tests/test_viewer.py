@@ -13,13 +13,17 @@ import pytest
 from conftest import BT, PERIODS, SYMBOL
 from mcp import Client, StdioServerParameters
 
-from trader import fmt, mcp_server, profit, runner, store, viewer
+from trader import fmt, mcp_server, runner, store, viewer
 
 HYP = "以 5 日與 20 日均線交叉作為基準策略。"
 
 
 def bt(ws, **kw):
     return runner.run_backtest(ws, "ma_cross", SYMBOL, *PERIODS, HYP, **kw)
+
+
+def write_hold(ws):
+    (ws / "strategies" / "hold.py").write_text("def on_bar(hist, pos, p):\n    return 1.0\n")
 
 
 @pytest.fixture
@@ -88,19 +92,18 @@ def test_three_surfaces_show_identical_strings(ws, served):
     for name, text in texts.items():
         for v in values:
             assert v in text, (name, v)
-    for period in ("dev", "exec"):
-        for d in detail["drawdowns"][period]:
-            assert all(v in texts["get_run"] for v in d.values())
+    for g in detail["regime_summary"]:
+        for name, text in texts.items():
+            assert (
+                f"| {g['label']} | {g['segments']} | {g['bars']} | {g['price_change']} "
+                f"| {g['strategy']} | {g['exposure']} |" in text
+            ), name
+    for d in detail["drawdowns"]:
+        assert all(v in texts["get_run"] for v in d.values())
     for f in detail["fills"]:
-        assert (
-            f"| {f['period']} | {f['date']} | {f['side']} | {f['price']} | {f['shares']} "
-            in (texts["get_run"])
-        )
+        assert f"| {f['date']} | {f['side']} | {f['price']} | {f['shares']} " in texts["get_run"]
     for t in detail["trips"]:
-        assert (
-            f"| {t['period']} | {t['entry']} | {t['exit']} | {t['held']} | {t['pnl']} |"
-            in (texts["get_run"])
-        )
+        assert f"| {t['entry']} | {t['exit']} | {t['held']} | {t['pnl']} |" in texts["get_run"]
 
 
 def test_run_payload_shape_and_chart(ws, served):
@@ -108,32 +111,20 @@ def test_run_payload_shape_and_chart(ws, served):
     d = api(f"{served}/api/runs/{run.id}")
     assert set(d) == {
         "id", "n", "study_key", "symbol", "label", "strategy", "hypothesis", "params", "diff",
-        "created_at", "dev", "exec", "metrics", "trade_metrics", "overfit", "overfit_note",
-        "drawdowns", "regimes", "regime_rules", "chart", "fills", "trips", "source",
-        "source_sha", "data_sha",
+        "created_at", "period", "metrics", "trade_metrics", "drawdowns", "regimes",
+        "regime_summary", "regime_rules", "chart", "fills", "trips", "source", "source_sha",
+        "data_sha",
     }  # fmt: skip
-    assert (d["dev"], d["exec"]) == (fmt.span(*PERIODS[:2]), fmt.span(*PERIODS[2:]))
-    assert d["overfit_note"] == (fmt.OVERFIT_NOTE if d["overfit"] else None)
-    c, p = d["chart"], run.payload
+    assert d["period"] == fmt.span(*PERIODS)
+    c, p, led = d["chart"], run.payload, run.payload["ledger"]
+    # the price chart includes the warm-up history; the other charts cover the period only
     assert c["dates"] == p["bars"]["date"] and c["close"] == p["bars"]["close"]
-    assert c["dev_dates"] == p["dev"]["dates"] and c["exec_dates"] == p["exec"]["dates"]
-    cash = run.cash
-    cum = profit.chained_returns(cash, p["dev"]["equity"], p["exec"]["equity"])
-    assert c["cum"] == [round(x * 100, 2) for x in cum]
-    assert len(c["cum"]) == len(c["cum_bh"]) == len(c["dev_dates"]) + len(c["exec_dates"])
-    peak, dd = run.cash, []
-    for e in p["exec"]["equity"]:
-        peak = max(peak, e)
-        dd.append(round((e / peak - 1) * 100, 2))
-    assert c["dd_exec"] == dd and len(c["dd_dev"]) == len(c["dev_dates"])
-    assert min(c["dd_exec"]) == round(run.report.exec.strategy.mdd * 100, 2)
-    fills = p["dev"]["fills"] + p["exec"]["fills"]
-    assert c["markers"] == [{"date": f["date"], "side": f["side"]} for f in fills]
-    assert [f["period"] for f in d["fills"]] == ["開發期間"] * len(p["dev"]["fills"]) + [
-        "執行期間"
-    ] * len(p["exec"]["fills"])
+    assert c["bt_dates"] == led["dates"] and c["bt_dates"][0] >= PERIODS[0] > c["dates"][0]
+    assert c["cum"] == [round((e / run.cash - 1) * 100, 2) for e in led["equity"]]
+    assert len(c["cum"]) == len(c["cum_bh"]) == len(c["dd"]) == len(c["bt_dates"])
+    assert min(c["dd"]) == round(run.report.strategy.mdd * 100, 2)
+    assert c["markers"] == [{"date": f["date"], "side": f["side"]} for f in led["fills"]]
     assert set(d["fills"][0]) == {
-        "period",
         "date",
         "side",
         "buy",
@@ -150,9 +141,8 @@ def test_tree_and_study_payloads(ws, served):
     first = bt(ws)
     second = bt(ws, params={"fast": 8})
     third = bt(ws, params={"fast": 8})
-    other = runner.run_backtest(
-        ws, "ma_cross", SYMBOL, PERIODS[0], PERIODS[1], "2024-04-15", PERIODS[3], "另一研究"
-    )
+    write_hold(ws)
+    other = runner.run_backtest(ws, "hold", SYMBOL, *PERIODS, "另一研究")
     mcp_server.finalize(
         ws, second.id, "以第二次迭代定稿。", [{"finding": "發現。", "insight": "洞察。"}] * 3, 8765
     )
@@ -162,18 +152,16 @@ def test_tree_and_study_payloads(ws, served):
     studies = tree[0]["studies"]
     assert [s["key"] for s in studies] == [other.study_key, first.study_key]  # newest first
     s = studies[1]
-    assert (s["question"], s["final_run_id"], s["dev"]) == (HYP, second.id, fmt.span(*PERIODS[:2]))
+    assert (s["question"], s["final_run_id"], s["period"]) == (HYP, second.id, fmt.span(*PERIODS))
     assert [r["id"] for r in s["runs"]] == [first.id, second.id, third.id]
     assert [r["n"] for r in s["runs"]] == [1, 2, 3]
     assert [r["final"] for r in s["runs"]] == [False, True, False]
-    assert s["runs"][0]["exec_ret"] == fmt.pct(first.report.exec.strategy.ret)
+    assert s["runs"][0]["ret"] == fmt.pct(first.report.strategy.ret)
     assert set(s["runs"][0]) == {
         "id",
         "n",
         "hypothesis",
-        "dev_ret",
-        "exec_ret",
-        "overfit",
+        "ret",
         "final",
         "created_at",
     }
@@ -185,12 +173,12 @@ def test_tree_and_study_payloads(ws, served):
     assert [i["diff"] for i in st["iterations"]] == ["首次回測", "fast 5→8", "參數未變更"]
     it = st["iterations"][1]
     assert it["final"] and it["params"] == "fast=8, slow=20"
-    ex = second.report.exec
-    assert (it["exec_mdd"], it["exec_sharpe"], it["exec_trades"], it["bh_exec_ret"]) == (
-        fmt.pct(ex.strategy.mdd),
-        fmt.ratio(ex.strategy.sharpe),
-        fmt.shares(ex.trades.count),
-        fmt.pct(ex.bh.ret),
+    rep = second.report
+    assert (it["mdd"], it["sharpe"], it["trades"], it["bh_ret"]) == (
+        fmt.pct(rep.strategy.mdd),
+        fmt.ratio(rep.strategy.sharpe),
+        fmt.shares(rep.trades.count),
+        fmt.pct(rep.bh.ret),
     )
     assert api(f"{served}/api/runs/{third.id}")["diff"] == "參數未變更"
     assert api(f"{served}/api/info") == {"workspace": str(ws)}
@@ -237,7 +225,7 @@ def test_mcp_starts_viewer_for_its_links(ws, monkeypatch):
 
     status, payload, text = asyncio.run(go())
     assert status == 200
-    assert payload["metrics"][0]["exec"] in text
+    assert payload["metrics"][0]["strategy"] in text
 
 
 def test_rejects_foreign_host_headers(served):

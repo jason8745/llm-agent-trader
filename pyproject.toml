@@ -1,6 +1,6 @@
 [project]
 name = "llm-agent-trader"
-version = "2.4.3"
+version = "2.5.0"
 description = "Taiwan stock backtesting harness for coding agents: MCP tools, a deterministic engine, and a live dashboard."
 readme = "README.md"
 license = "MIT"

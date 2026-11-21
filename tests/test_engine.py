@@ -13,7 +13,7 @@ from trader.engine import (
     fees_for,
     simulate,
 )
-from trader.profit import metrics, study_report, trades
+from trader.profit import annualize, metrics, trades
 
 
 def scripted(*targets):
@@ -219,32 +219,9 @@ def test_fractional_target_survives_float_noise():
     assert led.fills[0].shares == 29
 
 
-def test_overfit_flag_compares_annualized_returns():
-    from trader.profit import annualize
-
-    # 2330.TW run: +63.64% over ~2 years of development, +48.10% over ~10 months of execution.
-    dev_ann = annualize(0.6364, "2023-01-03", "2025-02-14")
-    exec_ann = annualize(0.4810, "2025-02-14", "2025-12-31")
-    assert dev_ann < exec_ann, "better annualized in execution is not overfitting"
+def test_annualize():
     assert annualize(0.21, "2024-01-01", "2025-01-01") == pytest.approx(0.21, abs=1e-3)
     assert annualize(0.1, "2025-01-01", "2025-01-01") is None
-
-
-def test_overfit_flag_fires_when_execution_collapses():
-    n, s = 300, 210
-    closes = [100 * 1.002**t for t in range(s)] + [100 * 1.002 ** (s - 1)] * (n - s)
-    bars = make_bars(closes, closes)
-    hold = lambda _h, _p: 1.0  # noqa: E731
-    dev = simulate(bars.iloc[:s], hold, NO_FEES, 1e6)
-    exe = simulate(bars, hold, NO_FEES, 1e6, start=s)
-    r = study_report(
-        dev,
-        buy_and_hold(bars.iloc[:s], NO_FEES, 1e6),
-        exe,
-        buy_and_hold(bars, NO_FEES, 1e6, start=s),
-    )
-    assert r.exec.strategy.ret == pytest.approx(0, abs=0.01) and r.dev.strategy.ret > 0.3
-    assert r.overfit
 
 
 def test_peeking_strategy_cannot_profit():

@@ -19,9 +19,9 @@ and backtest them on a deterministic engine. The user may not be an engineer.
 
 At the start of every conversation, before any other trader tool, call get_research_guide and
 follow it exactly: it covers the research folder (ask before creating it), getting started,
-the five research conditions to confirm before the first backtest, writing strategies with
-save_strategy, the development and execution periods, number rules, formal written Chinese,
-and the verdict-plus-findings conclusion stored with finalize_study."""
+the four research conditions to confirm before the first backtest, writing strategies with
+save_strategy, the backtest period, number rules, formal written Chinese, and the
+verdict-plus-findings conclusion stored with finalize_study."""
 
 server = MCPServer("llm-agent-trader", instructions=INSTRUCTIONS)
 
@@ -145,20 +145,19 @@ def get_ohlcv(symbol: str, start: str, end: str, limit: int = 60) -> str:
 def run_backtest(
     strategy: str,
     symbol: str,
-    dev_start: str,
-    dev_end: str,
-    exec_start: str,
-    exec_end: str,
+    start: str,
+    end: str,
     hypothesis: str,
     params: dict | None = None,
     cash: float = runner.DEFAULT_CASH,
     fee: dict | None = None,
 ) -> str:
-    """Backtest a saved strategy on one symbol over a development and an execution period.
+    """Backtest a saved strategy on one symbol over one period.
     If you have not called get_research_guide in this conversation, call it first. Before the
-    first backtest of a study, confirm the five research conditions in the guide with the user.
+    first backtest of a study, confirm the four research conditions in the guide with the user.
 
-    Dates are YYYY-MM-DD, inclusive, with dev_start <= dev_end < exec_start <= exec_end.
+    Dates are YYYY-MM-DD, inclusive, start <= end. The 60 trading days before start are loaded
+    as indicator history automatically.
     hypothesis (required): one sentence stating what this run tests, in formal written
     language. params overrides keys in the strategy's PARAMS. fee overrides the default
     fee schedule (commission_rate, min_commission, sell_tax_rate, floor_to_unit).
@@ -170,10 +169,8 @@ def run_backtest(
             _ws(),
             strategy,
             symbol,
-            dev_start,
-            dev_end,
-            exec_start,
-            exec_end,
+            start,
+            end,
             hypothesis,
             params=params,
             cash=cash,
@@ -186,7 +183,7 @@ def run_backtest(
 
 @server.tool()
 def get_run(run_id: int) -> str:
-    """Full detail of one backtest: both periods' metrics, deepest drawdowns, market regimes,
+    """Full detail of one backtest: metrics against buy-and-hold, deepest drawdowns, market regimes,
     fills, round trips, data fingerprint and source snapshot."""
     if msg := _needs_workspace():
         return msg

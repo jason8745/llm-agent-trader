@@ -78,7 +78,7 @@ def test_handshake_is_instant_while_the_real_server_starts(ws):
         "open_dashboard",
     ]
     assert waited > 2, "the first call waits for the real server"
-    assert "回測 #1" in out and "策略執行期間" in out
+    assert "回測 #1" in out and "回測期間" in out
 
 
 def test_reports_a_server_that_cannot_start(ws):

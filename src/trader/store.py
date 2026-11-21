@@ -1,8 +1,7 @@
-"""runs.db: one row per backtest, self-contained enough to re-render without refetching,
-and one row per study (symbol, strategy and the two periods).
+"""backtests.db: one row per backtest, self-contained enough to re-render without refetching,
+and one row per study (symbol, strategy and the backtest period).
 
-The `runs` table of earlier versions (one 70/30 split per run) is left untouched and only
-counted."""
+Earlier versions stored two periods per backtest in runs.db; that file is not read."""
 
 import hashlib
 import json
@@ -10,7 +9,7 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
-from trader.profit import Drawdown, Metrics, Period, RegimeRow, StudyReport, Trades
+from trader.profit import Drawdown, Metrics, Period, RegimeRow, Trades
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS backtests (
@@ -19,10 +18,8 @@ CREATE TABLE IF NOT EXISTS backtests (
     study_key TEXT NOT NULL,
     strategy TEXT NOT NULL,
     symbol TEXT NOT NULL,
-    dev_start TEXT NOT NULL,
-    dev_end TEXT NOT NULL,
-    exec_start TEXT NOT NULL,
-    exec_end TEXT NOT NULL,
+    start TEXT NOT NULL,
+    "end" TEXT NOT NULL,
     hypothesis TEXT NOT NULL,
     params TEXT NOT NULL,
     cash REAL NOT NULL,
@@ -36,21 +33,18 @@ CREATE TABLE IF NOT EXISTS studies (
     key TEXT PRIMARY KEY,
     symbol TEXT NOT NULL,
     strategy TEXT NOT NULL,
-    dev_start TEXT NOT NULL,
-    dev_end TEXT NOT NULL,
-    exec_start TEXT NOT NULL,
-    exec_end TEXT NOT NULL,
+    start TEXT NOT NULL,
+    "end" TEXT NOT NULL,
     final_run_id INTEGER,
     conclusion TEXT,
     finalized_at TEXT
 );
 """
-STUDY_FIELDS = ("symbol", "strategy", "dev_start", "dev_end", "exec_start", "exec_end")
+STUDY_FIELDS = ("symbol", "strategy", "start", "end")
 
 
-def study_key(symbol, strategy, dev_start, dev_end, exec_start, exec_end) -> str:
-    raw = "|".join([symbol, strategy, dev_start, dev_end, exec_start, exec_end])
-    return hashlib.sha1(raw.encode()).hexdigest()[:12]
+def study_key(symbol, strategy, start, end) -> str:
+    return hashlib.sha1("|".join([symbol, strategy, start, end]).encode()).hexdigest()[:12]
 
 
 def _period(d: dict) -> Period:
@@ -69,10 +63,8 @@ class Run:
     study_key: str
     strategy: str
     symbol: str
-    dev_start: str
-    dev_end: str
-    exec_start: str
-    exec_end: str
+    start: str
+    end: str
     hypothesis: str
     params: dict
     cash: float
@@ -84,9 +76,8 @@ class Run:
     n: int  # 1-based iteration number within its study
 
     @property
-    def report(self) -> StudyReport:
-        r = self.payload["report"]
-        return StudyReport(dev=_period(r["dev"]), exec=_period(r["exec"]))
+    def report(self) -> Period:
+        return _period(self.payload["report"])
 
     @property
     def regimes(self) -> list[RegimeRow]:
@@ -104,17 +95,15 @@ class Study:
     key: str
     symbol: str
     strategy: str
-    dev_start: str
-    dev_end: str
-    exec_start: str
-    exec_end: str
+    start: str
+    end: str
     final_run_id: int | None
     conclusion: str | None
     finalized_at: str | None
 
 
 def db_path(workspace: Path) -> Path:
-    return workspace / ".trader" / "runs.db"
+    return workspace / ".trader" / "backtests.db"
 
 
 def connect(workspace: Path) -> sqlite3.Connection:
@@ -147,12 +136,14 @@ def insert(workspace: Path, **fields) -> Run:
         "payload": json.dumps(fields["payload"]),
     }
     with connect(workspace) as con:
+        cols = ", ".join(f'"{k}"' for k in STUDY_FIELDS)
         con.execute(
-            f"INSERT OR IGNORE INTO studies (key, {', '.join(STUDY_FIELDS)}) VALUES (?{', ?' * 6})",
+            f"INSERT OR IGNORE INTO studies (key, {cols}) VALUES (?{', ?' * len(STUDY_FIELDS)})",
             [key, *(fields[k] for k in STUDY_FIELDS)],
         )
         cur = con.execute(
-            f"INSERT INTO backtests ({', '.join(row)}) VALUES ({', '.join('?' for _ in row)})",
+            f"INSERT INTO backtests ({', '.join(f'"{k}"' for k in row)}) "
+            f"VALUES ({', '.join('?' for _ in row)})",
             list(row.values()),
         )
     return get(workspace, cur.lastrowid)

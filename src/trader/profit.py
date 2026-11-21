@@ -1,7 +1,7 @@
 """Performance metrics. Every number the harness reports is computed here.
 
-A backtest has a development period and an execution period, each its own ledger that
-starts flat with the initial cash; returns are measured against that cash.
+A backtest has one period. Its ledger starts flat with the initial cash on the first
+backtest bar; earlier bars are indicator history only. Returns are measured against that cash.
 """
 
 import datetime as dt
@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from trader.engine import Ledger
 from trader.regime import Regime
 
-OVERFIT_GAP = 0.15
 DAYS_PER_YEAR = 365.25
 TRADING_DAYS_PER_YEAR = 252
 TOP_DRAWDOWNS = 5
@@ -71,17 +70,6 @@ class Period:
     drawdowns: list[Drawdown]
 
 
-@dataclass(frozen=True)
-class StudyReport:
-    dev: Period
-    exec: Period
-
-    @property
-    def overfit(self) -> bool:
-        a, b = self.dev.strategy.annualized, self.exec.strategy.annualized
-        return a is not None and b is not None and a - b > OVERFIT_GAP
-
-
 def daily_returns(led: Ledger) -> list[float]:
     """r_0 = E[0] / initial cash - 1, r_t = E[t] / E[t-1] - 1."""
     e = [led.initial_cash, *led.equity]
@@ -133,17 +121,6 @@ def drawdown_curve(initial_cash: float, equity: list[float]) -> list[float]:
     return out
 
 
-def chained_returns(initial_cash: float, dev: list[float], exe: list[float]) -> list[float]:
-    """Cumulative return from the development start, one value per development and execution bar.
-
-    The execution period restarts from the initial cash, so its curve is chained to the
-    development end point: (1 + R_dev) * (E_t / initial cash) - 1. Inside the execution period
-    the change relative to its start therefore equals the execution return exactly.
-    """
-    base = dev[-1] / initial_cash
-    return [e / initial_cash - 1 for e in dev] + [base * e / initial_cash - 1 for e in exe]
-
-
 def metrics(led: Ledger) -> Metrics:
     e, d = led.equity, led.dates
     ret = e[-1] / led.initial_cash - 1
@@ -193,10 +170,6 @@ def period(led: Ledger, bh: Ledger) -> Period:
     return Period(strategy=metrics(led), trades=trades(led), bh=metrics(bh), drawdowns=deepest)
 
 
-def study_report(dev: Ledger, dev_bh: Ledger, exe: Ledger, exe_bh: Ledger) -> StudyReport:
-    return StudyReport(dev=period(dev, dev_bh), exec=period(exe, exe_bh))
-
-
 @dataclass(frozen=True)
 class RegimeRow:
     start: str
@@ -234,3 +207,38 @@ def regime_table(
             )
         )
     return rows
+
+
+REGIME_ORDER = ("up", "range", "down")
+
+
+@dataclass(frozen=True)
+class RegimeSummary:
+    kind: str
+    segments: int
+    bars: int
+    price_change: float
+    strategy: float
+    exposure: float
+
+
+def regime_summary(rows: list[RegimeRow]) -> list[RegimeSummary]:
+    """One row per regime kind present, in up, range, down order. Price change and strategy
+    return compound the segments of that kind; exposure is weighted by trading days."""
+    out = []
+    for kind in REGIME_ORDER:
+        g = [r for r in rows if r.kind == kind]
+        if not g:
+            continue
+        bars = sum(r.bars for r in g)
+        out.append(
+            RegimeSummary(
+                kind=kind,
+                segments=len(g),
+                bars=bars,
+                price_change=math.prod(1 + r.price_change for r in g) - 1,
+                strategy=math.prod(1 + r.strategy for r in g) - 1,
+                exposure=sum(r.exposure * r.bars for r in g) / bars if bars else 0.0,
+            )
+        )
+    return out

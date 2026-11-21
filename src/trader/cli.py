@@ -16,7 +16,7 @@ def main(argv: list[str] | None = None) -> None:
     bt = sub.add_parser("backtest", help="backtest a strategy file")
     bt.add_argument("strategy")
     bt.add_argument("symbol")
-    for name in ("dev_start", "dev_end", "exec_start", "exec_end"):
+    for name in ("start", "end"):
         bt.add_argument(name, help="YYYY-MM-DD")
     bt.add_argument("--hypothesis", required=True)
     bt.add_argument("--params", type=json.loads, default=None, help="JSON, e.g. '{\"fast\": 5}'")
@@ -50,10 +50,8 @@ def main(argv: list[str] | None = None) -> None:
                 ws,
                 args.strategy,
                 args.symbol,
-                args.dev_start,
-                args.dev_end,
-                args.exec_start,
-                args.exec_end,
+                args.start,
+                args.end,
                 args.hypothesis,
                 params=args.params,
                 cash=args.cash,

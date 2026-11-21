@@ -38,3 +38,4 @@ ts	phase	decision	why	evidence	result
 2026-11-21T08:45:35Z	workspace	研究資料夾只有一個：~/Documents/trader-research；只由 setup_workspace 在使用者同意後建立	使用者要求更簡化、由 skill 處理並徵求同意；非工程師在 Finder 看得到「文件」	tests/test_mcp.py、tests/test_cli.py	同意前不會建立
 2026-11-21T08:45:35Z	guide	研究規則集中於 src/trader/guide.md，由 get_research_guide 提供；新增 save_strategy；launcher 直接回應 guide 與 setup	Claude Desktop 不一定讀取 skill 或 server instructions，且沒有寫檔工具；首個工具呼叫不可等待依賴安裝	docs/v2/evidence/pr21/claude-code-turn1..4.md	四輪對話符合設計
 2026-11-21T08:45:35Z	readme	README 改為繁體中文，Claude Desktop 安裝在前	目標使用者為台灣非工程師；使用者將錄製 demo 影片	README.md	完成
+2026-11-21T12:32:50Z	periods	取消策略開發期間與策略執行期間，改為單一回測期間；起日前 60 個交易日自動作為指標暖機；結論改為涵蓋參數敏感度；盤勢表現改為按類型彙總；舊格式紀錄不再讀取	使用者指出純回測不像機器學習，分段比較沒有必要且難懂；逐段盤勢表沒人讀得懂	tests/test_runner.py、tests/test_metrics.py、docs/v2/evidence/pr27	2.5.0

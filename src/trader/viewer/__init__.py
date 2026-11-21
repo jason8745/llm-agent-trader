@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from trader import fmt, store
-from trader.profit import chained_returns, drawdown_curve
+from trader.profit import drawdown_curve, regime_summary
 
 STATIC = Path(__file__).parent
 FILES = {
@@ -64,8 +64,7 @@ def tree_payload(workspace: Path) -> list[dict]:
             {
                 "key": key,
                 "strategy": first.strategy,
-                "dev": fmt.span(first.dev_start, first.dev_end),
-                "exec": fmt.span(first.exec_start, first.exec_end),
+                "period": fmt.span(first.start, first.end),
                 "question": first.hypothesis,
                 "final_run_id": final,
                 "updated_at": runs[-1].created_at,
@@ -74,9 +73,7 @@ def tree_payload(workspace: Path) -> list[dict]:
                         "id": r.id,
                         "n": r.n,
                         "hypothesis": r.hypothesis,
-                        "dev_ret": fmt.pct(r.report.dev.strategy.ret),
-                        "exec_ret": fmt.pct(r.report.exec.strategy.ret),
-                        "overfit": r.report.overfit,
+                        "ret": fmt.pct(r.report.strategy.ret),
                         "final": r.id == final,
                         "created_at": r.created_at,
                     }
@@ -96,7 +93,6 @@ def study_payload(workspace: Path, key: str) -> dict | None:
     iterations = []
     for r in runs:
         rep = r.report
-        ex = rep.exec
         iterations.append(
             {
                 "id": r.id,
@@ -104,15 +100,12 @@ def study_payload(workspace: Path, key: str) -> dict | None:
                 "hypothesis": r.hypothesis,
                 "params": fmt.params_text(r.params),
                 "diff": diffs[r.id],
-                "dev_ret": fmt.pct(rep.dev.strategy.ret),
-                "dev_ann": fmt.pct(rep.dev.strategy.annualized),
-                "exec_ret": fmt.pct(ex.strategy.ret),
-                "exec_ann": fmt.pct(ex.strategy.annualized),
-                "bh_exec_ret": fmt.pct(ex.bh.ret),
-                "exec_mdd": fmt.pct(ex.strategy.mdd),
-                "exec_sharpe": fmt.ratio(ex.strategy.sharpe),
-                "exec_trades": fmt.shares(ex.trades.count),
-                "overfit": rep.overfit,
+                "ret": fmt.pct(rep.strategy.ret),
+                "ann": fmt.pct(rep.strategy.annualized),
+                "bh_ret": fmt.pct(rep.bh.ret),
+                "mdd": fmt.pct(rep.strategy.mdd),
+                "sharpe": fmt.ratio(rep.strategy.sharpe),
+                "trades": fmt.shares(rep.trades.count),
                 "final": r.id == study.final_run_id,
             }
         )
@@ -121,8 +114,7 @@ def study_payload(workspace: Path, key: str) -> dict | None:
         "symbol": study.symbol,
         "label": runs[0].label,
         "strategy": study.strategy,
-        "dev": fmt.span(study.dev_start, study.dev_end),
-        "exec": fmt.span(study.exec_start, study.exec_end),
+        "period": fmt.span(study.start, study.end),
         "question": runs[0].hypothesis,
         "conclusion": json.loads(study.conclusion) if study.conclusion else None,
         "finalized_at": study.finalized_at,
@@ -145,7 +137,7 @@ def run_payload(workspace: Path, run_id: int) -> dict | None:
         return None
     runs = store.list_runs(workspace, study=run.study_key)
     p, rep, cash = run.payload, run.report, run.cash
-    bars, dev, exe = p["bars"], p["dev"], p["exec"]
+    bars, led = p["bars"], p["ledger"]
     return {
         "id": run.id,
         "n": run.n,
@@ -157,34 +149,25 @@ def run_payload(workspace: Path, run_id: int) -> dict | None:
         "params": fmt.params_text(run.params),
         "diff": _diffs(runs)[run.id],
         "created_at": run.created_at,
-        "dev": fmt.span(run.dev_start, run.dev_end),
-        "exec": fmt.span(run.exec_start, run.exec_end),
+        "period": fmt.span(run.start, run.end),
         "metrics": fmt.metric_rows(rep),
         "trade_metrics": fmt.trade_rows(rep),
-        "overfit": rep.overfit,
-        "overfit_note": fmt.OVERFIT_NOTE if rep.overfit else None,
-        "drawdowns": {
-            "dev": fmt.drawdown_rows(rep.dev.drawdowns),
-            "exec": fmt.drawdown_rows(rep.exec.drawdowns),
-        },
+        "drawdowns": fmt.drawdown_rows(rep.drawdowns),
         "regimes": fmt.regime_rows(run.regimes),
+        "regime_summary": fmt.regime_summary_rows(regime_summary(run.regimes)),
         "regime_rules": fmt.REGIME_RULES,
         "chart": {
             "dates": bars["date"],
             **{c: bars[c] for c in ("open", "high", "low", "close", "volume")},
-            "dev_dates": dev["dates"],
-            "exec_dates": exe["dates"],
-            "cum": _pct(chained_returns(cash, dev["equity"], exe["equity"])),
-            "cum_bh": _pct(chained_returns(cash, p["bh_dev"], p["bh_exec"])),
-            "dd_dev": _dd(dev["equity"], cash),
-            "dd_exec": _dd(exe["equity"], cash),
-            "markers": [
-                {"date": f["date"], "side": f["side"]} for f in dev["fills"] + exe["fills"]
-            ],
+            "bt_dates": led["dates"],
+            "cum": _pct([e / cash - 1 for e in led["equity"]]),
+            "cum_bh": _pct([e / cash - 1 for e in p["bh"]]),
+            "dd": _dd(led["equity"], cash),
+            "markers": [{"date": f["date"], "side": f["side"]} for f in led["fills"]],
             "regimes": [{"start": g.start, "end": g.end, "kind": g.kind} for g in run.regimes],
         },
         "fills": [
-            {k: f[k] for k in ("period", "date", "side", "buy", "price", "shares", "gross", "fees")}
+            {k: f[k] for k in ("date", "side", "buy", "price", "shares", "gross", "fees")}
             for f in fmt.fill_rows(run)
         ],
         "trips": fmt.trip_rows(run),

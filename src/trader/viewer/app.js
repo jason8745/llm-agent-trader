@@ -4,9 +4,7 @@ const LC = window.LightweightCharts;
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const tone = (s) => (String(s).startsWith("+") ? "up" : String(s).startsWith("-") ? "down" : "");
-const FLAG = '<span class="flag" title="策略開發期間的年化報酬率較策略執行期間高出逾 15 個百分點">⚑</span>';
 const REGIME = { up: "rgba(239,68,68,0.10)", down: "rgba(34,197,94,0.10)", range: "rgba(148,163,184,0.08)" };
-const EXEC_BAND = "rgba(240,180,41,0.06)";
 
 function groupDigits(value, decimals) {
   const scale = 10 ** decimals;
@@ -39,11 +37,11 @@ function renderTree() {
         <section class="study" aria-current="${!!study && study.key === st.key}">
           <button class="sh" data-study="${esc(st.key)}"><span class="sname">${esc(st.strategy)}</span>
             ${st.final_run_id ? '<span class="badge done">已定稿</span>' : '<span class="badge">研究中</span>'}
-            <span class="per">開發 ${esc(st.dev)}<br>執行 ${esc(st.exec)}</span></button>
+            <span class="per">${esc(st.period)}</span></button>
           <ol class="steps">${st.runs.map((r) => `
             <li><button data-run="${r.id}" aria-current="${!!run && run.id === r.id}"><span class="dot">${r.n}</span>
               <span><span class="hyp">${esc(r.hypothesis)}</span>
-              <span class="m">開發 <b class="${tone(r.dev_ret)}">${esc(r.dev_ret)}</b> · 執行 <b class="${tone(r.exec_ret)}">${esc(r.exec_ret)}</b>${r.overfit ? " " + FLAG : ""}${r.final ? ' <span class="badge done">定稿</span>' : ""}</span></span>
+              <span class="m">報酬率 <b class="${tone(r.ret)}">${esc(r.ret)}</b>${r.final ? ' <span class="badge done">定稿</span>' : ""}</span></span>
             </button></li>`).join("")}</ol>
         </section>`).join("")}
     </details>`).join("");
@@ -55,23 +53,17 @@ function renderCenter() {
   $("ctx").innerHTML = `
     <div class="row"><h1>${esc(st.label)}</h1><span class="sname">${esc(st.strategy)}</span>
       ${st.final_run_id ? '<span class="badge done">已定稿</span>' : '<span class="badge">研究中</span>'}
-      <span class="pchip">策略開發期間 <b>${esc(st.dev)}</b></span><span class="pchip x">策略執行期間 <b>${esc(st.exec)}</b></span></div>
+      <span class="pchip">回測期間 <b>${esc(st.period)}</b></span></div>
     <div class="seg" role="group" aria-label="切換迭代">${st.iterations.map((it) => `
-      <button data-run="${it.id}" aria-pressed="${it.id === r.id}"><span class="t">第 ${it.n} 次 · ${esc(it.params)}${it.final ? ' <span class="badge done">定稿</span>' : ""}${it.overfit ? FLAG : ""}</span>
-        <span class="k">開發 <b class="${tone(it.dev_ret)}">${esc(it.dev_ret)}</b></span><span class="k">執行 <b class="${tone(it.exec_ret)}">${esc(it.exec_ret)}</b></span></button>`).join("")}</div>`;
-  const ret = row(M, "總報酬率"), mdd = row(M, "最大回撤"), sharpe = row(M, "Sharpe 比率（無風險利率 0）");
+      <button data-run="${it.id}" aria-pressed="${it.id === r.id}"><span class="t">第 ${it.n} 次 · ${esc(it.params)}${it.final ? ' <span class="badge done">定稿</span>' : ""}</span>
+        <span class="k">報酬率 <b class="${tone(it.ret)}">${esc(it.ret)}</b></span><span class="k">最大回撤 <b class="${tone(it.mdd)}">${esc(it.mdd)}</b></span></button>`).join("")}</div>`;
+  const kpi = (label, key, main) => { const m = row(M, key); return `<div class="kpi${main ? " main" : ""}"><small>${label}</small><div class="v ${tone(m.strategy)}">${esc(m.strategy)}</div><div class="s">買進並持有 ${esc(m.bh)}</div></div>`; };
   $("hl").innerHTML = `
     <p class="q"><small>第 ${r.n} 次迭代的假設 · ${esc(r.diff)}</small>${esc(r.hypothesis)}</p>
-    <div class="kpis">
-      <div class="kpi main"><small>策略執行期間報酬率</small><div class="v ${tone(ret.exec)}">${esc(ret.exec)}</div><div class="s">買進並持有 ${esc(ret.bh_exec)}</div></div>
-      <div class="kpi"><small>策略開發期間報酬率</small><div class="v ${tone(ret.dev)}">${esc(ret.dev)}</div><div class="s">買進並持有 ${esc(ret.bh_dev)}</div></div>
-      <div class="kpi"><small>策略執行期間最大回撤</small><div class="v ${tone(mdd.exec)}">${esc(mdd.exec)}</div><div class="s">買進並持有 ${esc(mdd.bh_exec)}</div></div>
-      <div class="kpi"><small>策略執行期間 Sharpe 比率</small><div class="v">${esc(sharpe.exec)}</div><div class="s">策略開發期間 ${esc(sharpe.dev)}</div></div>
-    </div>
-    ${r.overfit_note ? `<p class="note">${esc(r.overfit_note)}</p>` : ""}`;
+    <div class="kpis">${kpi("報酬率", "總報酬率", true)}${kpi("年化報酬率", "年化報酬率")}${kpi("最大回撤", "最大回撤")}${kpi("Sharpe 比率", "Sharpe 比率（無風險利率 0）")}</div>`;
   $("lg1").innerHTML = `<span class="up">▲ 買進</span><span class="down">▼ 賣出</span>
     <span><i class="sw" style="background:${REGIME.up}"></i>上漲段</span><span><i class="sw" style="background:${REGIME.range}"></i>盤整段</span>
-    <span><i class="sw" style="background:${REGIME.down}"></i>下跌段</span><span><i class="ln xline"></i>策略執行期間起點</span>`;
+    <span><i class="sw" style="background:${REGIME.down}"></i>下跌段</span>`;
   renderDrawer();
   drawCharts(r);
 }
@@ -95,22 +87,22 @@ function drawerBody(r) {
   }
   if (drawerTab === "dd") {
     const head = '<th>高點日期</th><th>低點日期</th><th class="n">回撤幅度</th><th>回復日期</th><th class="n">持續交易日</th>';
-    const rows = (list) => list.map((d) => `<tr><td>${esc(d.peak)}</td><td>${esc(d.trough)}</td><td class="n down">${esc(d.depth)}</td><td>${esc(d.recovery)}</td><td class="n">${esc(d.bars)}</td></tr>`).join("") || '<tr><td colspan="5" class="mu">無回撤。</td></tr>';
-    return `<h4>策略開發期間</h4>${table(head, rows(r.drawdowns.dev))}<h4>策略執行期間</h4>${table(head, rows(r.drawdowns.exec))}`;
+    const rows = r.drawdowns.map((d) => `<tr><td>${esc(d.peak)}</td><td>${esc(d.trough)}</td><td class="n down">${esc(d.depth)}</td><td>${esc(d.recovery)}</td><td class="n">${esc(d.bars)}</td></tr>`).join("") || '<tr><td colspan="5" class="mu">無回撤。</td></tr>';
+    return table(head, rows);
   }
   if (drawerTab === "trips") {
     if (!r.trips.length) return '<p class="empty">無已平倉交易。</p>';
-    return table('<th>期間</th><th>進場</th><th>出場</th><th class="n">持有交易日</th><th class="n">已實現損益</th>',
-      r.trips.map((t) => `<tr><td>${esc(t.period)}</td><td>${esc(t.entry)}</td><td>${esc(t.exit)}</td><td class="n">${esc(t.held)}</td><td class="n ${t.win ? "up" : "down"}">${esc(t.pnl)}</td></tr>`).join(""));
+    return table('<th>進場</th><th>出場</th><th class="n">持有交易日</th><th class="n">已實現損益</th>',
+      r.trips.map((t) => `<tr><td>${esc(t.entry)}</td><td>${esc(t.exit)}</td><td class="n">${esc(t.held)}</td><td class="n ${t.win ? "up" : "down"}">${esc(t.pnl)}</td></tr>`).join(""));
   }
   if (!r.fills.length) return '<p class="empty">無成交。</p>';
-  return table('<th>期間</th><th>日期</th><th>方向</th><th class="n">價格</th><th class="n">股數</th><th class="n">成交金額</th><th class="n">手續費與稅</th>',
-    r.fills.map((f) => `<tr><td>${esc(f.period)}</td><td>${esc(f.date)}</td><td class="${f.buy ? "up" : "down"}">${esc(f.side)}</td><td class="n">${esc(f.price)}</td><td class="n">${esc(f.shares)}</td><td class="n">${esc(f.gross)}</td><td class="n">${esc(f.fees)}</td></tr>`).join(""));
+  return table('<th>日期</th><th>方向</th><th class="n">價格</th><th class="n">股數</th><th class="n">成交金額</th><th class="n">手續費與稅</th>',
+    r.fills.map((f) => `<tr><td>${esc(f.date)}</td><td class="${f.buy ? "up" : "down"}">${esc(f.side)}</td><td class="n">${esc(f.price)}</td><td class="n">${esc(f.shares)}</td><td class="n">${esc(f.gross)}</td><td class="n">${esc(f.fees)}</td></tr>`).join(""));
 }
 
 // ---------- charts ----------
 class Overlay {
-  constructor({ bands = [], line = null, labels = [] }) { Object.assign(this, { bands, line, labels }); }
+  constructor({ bands = [], labels = [] }) { Object.assign(this, { bands, labels }); }
   attached({ chart }) { this.chart = chart; }
   paneViews() {
     return [{
@@ -124,13 +116,6 @@ class Overlay {
             if (x1 === null || x2 === null) continue;
             ctx.fillStyle = b.color;
             ctx.fillRect(Math.round(x1 * k), 0, Math.max(1, Math.round((x2 - x1) * k)), h);
-          }
-          if (this.line) {
-            const x = ts.timeToCoordinate(this.line);
-            if (x !== null) {
-              ctx.strokeStyle = "rgba(240,180,41,0.85)"; ctx.setLineDash([6 * k, 4 * k]); ctx.lineWidth = k;
-              ctx.beginPath(); ctx.moveTo(Math.round(x * k) + 0.5, 0); ctx.lineTo(Math.round(x * k) + 0.5, h); ctx.stroke(); ctx.setLineDash([]);
-            }
           }
           for (const l of this.labels) {
             const x1 = ts.timeToCoordinate(l.start), x2 = ts.timeToCoordinate(l.end);
@@ -167,15 +152,13 @@ function drawCharts(r) {
   charts.forEach((c) => c.remove());
   charts = [];
   if (!LC) { $("c1").textContent = "圖表元件載入失敗。"; return; }
-  const c = r.chart, x0 = c.exec_dates[0], xEnd = c.exec_dates[c.exec_dates.length - 1];
-  const M = r.metrics, ret = row(M, "總報酬率"), mdd = row(M, "最大回撤");
+  const c = r.chart;
 
   const price = makeChart($("c1"));
   const candles = price.addSeries(LC.CandlestickSeries, { upColor: "#ef4444", downColor: "#22c55e", borderVisible: false, wickUpColor: "#ef4444", wickDownColor: "#22c55e", priceFormat: fmtPrice });
   candles.setData(c.dates.map((t, i) => ({ time: t, open: c.open[i], high: c.high[i], low: c.low[i], close: c.close[i] })));
   candles.attachPrimitive(new Overlay({
     bands: c.regimes.map((g) => ({ start: g.start, end: g.end, color: REGIME[g.kind] })),
-    line: x0,
     labels: r.regimes.map((g) => ({ start: g.start, end: g.end, text: g.label, sub: g.price_change, min: 70 })),
   }));
   LC.createSeriesMarkers(candles, c.markers.map((m) => m.side === "BUY"
@@ -185,33 +168,15 @@ function drawCharts(r) {
   vol.setData(c.dates.map((t, i) => ({ time: t, value: c.volume[i], color: c.close[i] >= c.open[i] ? "rgba(239,68,68,0.5)" : "rgba(34,197,94,0.5)" })));
   price.panes()[1].setHeight(64);
 
-  const dates2 = [...c.dev_dates, ...c.exec_dates];
+  // Warm-up bars are on the price chart only; blank points keep the three time axes aligned.
+  const blank = c.dates.slice(0, c.dates.indexOf(c.bt_dates[0])).map((t) => ({ time: t }));
+  const bt = (values) => [...blank, ...ser(c.bt_dates, values)];
   const cum = makeChart($("c2"));
-  const strat = cum.addSeries(LC.LineSeries, { color: "#f0b429", lineWidth: 2, priceLineVisible: false, priceFormat: fmtPct });
-  strat.setData(ser(dates2, c.cum));
-  cum.addSeries(LC.LineSeries, { color: "#94a3b8", lineWidth: 1.5, lineStyle: 2, priceLineVisible: false, priceFormat: fmtPct }).setData(ser(dates2, c.cum_bh));
-  strat.attachPrimitive(new Overlay({
-    bands: [{ start: x0, end: xEnd, color: EXEC_BAND }], line: x0,
-    labels: [
-      { start: c.dev_dates[0], end: c.dev_dates[c.dev_dates.length - 1], text: "策略開發期間", sub: `策略 ${ret.dev}　買進並持有 ${ret.bh_dev}` },
-      { start: x0, end: xEnd, text: "策略執行期間", sub: `策略 ${ret.exec}　買進並持有 ${ret.bh_exec}`, color: "#f0b429" },
-    ],
-  }));
+  cum.addSeries(LC.LineSeries, { color: "#f0b429", lineWidth: 2, priceLineVisible: false, priceFormat: fmtPct }).setData(bt(c.cum));
+  cum.addSeries(LC.LineSeries, { color: "#94a3b8", lineWidth: 1.5, lineStyle: 2, priceLineVisible: false, priceFormat: fmtPct }).setData(bt(c.cum_bh));
 
   const dd = makeChart($("c3"));
-  const area = (data, strong) => {
-    const a = dd.addSeries(LC.AreaSeries, { lineColor: strong ? "#22c55e" : "rgba(34,197,94,0.45)", topColor: "rgba(34,197,94,0.03)", bottomColor: strong ? "rgba(34,197,94,0.4)" : "rgba(34,197,94,0.14)", lineWidth: strong ? 1.5 : 1, priceLineVisible: false, lastValueVisible: false, priceFormat: fmtPct, invertFilledArea: true });
-    a.setData(data);
-    return a;
-  };
-  area(ser(c.dev_dates, c.dd_dev), false).attachPrimitive(new Overlay({
-    bands: [{ start: x0, end: xEnd, color: EXEC_BAND }], line: x0,
-    labels: [
-      { start: c.dev_dates[0], end: c.dev_dates[c.dev_dates.length - 1], text: `最大回撤 ${mdd.dev}` },
-      { start: x0, end: xEnd, text: `最大回撤 ${mdd.exec}`, color: "#f0b429" },
-    ],
-  }));
-  area(ser(c.exec_dates, c.dd_exec), true);
+  dd.addSeries(LC.AreaSeries, { lineColor: "#22c55e", topColor: "rgba(34,197,94,0.03)", bottomColor: "rgba(34,197,94,0.4)", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, priceFormat: fmtPct, invertFilledArea: true }).setData(bt(c.dd));
 
   const mine = [price, cum, dd];
   charts = mine;
@@ -237,38 +202,33 @@ function readout(c, time) {
   const d = time || c.dates[c.dates.length - 1];
   const i = c.dates.indexOf(d);
   $("r1").innerHTML = i < 0 ? "" : `<b>${d}</b>　開 <b>${groupDigits(c.open[i], 2)}</b>　高 <b>${groupDigits(c.high[i], 2)}</b>　低 <b>${groupDigits(c.low[i], 2)}</b>　收 <b>${groupDigits(c.close[i], 2)}</b>　量 <b>${groupDigits(c.volume[i], 0)}</b>`;
-  const dates2 = [...c.dev_dates, ...c.exec_dates], j = dates2.indexOf(d);
+  const j = c.bt_dates.indexOf(d);
   $("r2").innerHTML = j < 0 ? "" : `策略 <b>${groupDigits(c.cum[j], 2)}%</b>　買進並持有 <b>${groupDigits(c.cum_bh[j], 2)}%</b>`;
-  const dds = [...c.dd_dev, ...c.dd_exec];
-  $("r3").innerHTML = j < 0 ? "" : `回撤 <b>${groupDigits(dds[j], 2)}%</b>`;
+  $("r3").innerHTML = j < 0 ? "" : `回撤 <b>${groupDigits(c.dd[j], 2)}%</b>`;
 }
 
 // ---------- right: conclusion and scorecard ----------
 function renderRight() {
   const st = study, r = run, M = r.metrics, T = r.trade_metrics, con = st.conclusion;
   const finalIt = st.iterations.find((it) => it.final);
-  const ann = row(M, "年化報酬率");
-  const scoreRows = [["報酬率", "總報酬率"], ["年化報酬率", "年化報酬率"], ["最大回撤", "最大回撤"], ["Sharpe 比率", "Sharpe 比率（無風險利率 0）"]]
-    .map(([l, k]) => { const m = row(M, k); return `<div class="lb">${l}</div><div class="v ${tone(m.dev)}">${esc(m.dev)}<small>${esc(m.bh_dev)}</small></div><div class="v x b ${tone(m.exec)}">${esc(m.exec)}<small>${esc(m.bh_exec)}</small></div>`; }).join("");
-  const trades = row(T, "交易次數");
+  const vs = (label, key) => { const m = row(M, key); return `<div class="lb">${label}</div><div class="v b ${tone(m.strategy)}">${esc(m.strategy)}</div><div class="v mu">${esc(m.bh)}</div>`; };
+  const solo = (label, key) => { const t = row(T, key); return `<div class="lb">${label}</div><div class="v b">${esc(t.value)}</div><div class="v mu">—</div>`; };
   $("right").innerHTML = `
     <section class="card"><h3>結論${con ? `<span class="badge done">已定稿 ${esc(st.finalized_at)}</span>` : '<span class="badge">研究中</span>'}</h3>
       ${con ? `<p class="verdict">${esc(con.verdict)}</p>${finalIt && finalIt.id !== r.id ? `<p class="mu" style="margin-top:6px;font-size:12px">結論對應第 ${finalIt.n} 次迭代（定稿）。</p>` : ""}`
         : '<p class="mu">尚未定稿。Claude 定稿時會寫入一句總結與數組發現與洞察。</p>'}</section>
-    <section class="card"><h3>兩段期間對照<span class="mu" style="font-weight:400">策略／買進並持有</span></h3>
-      <div class="score"><div class="hd"></div><div class="hd v">策略開發期間</div><div class="hd v x">策略執行期間</div>${scoreRows}
-        <div class="lb">交易次數</div><div class="v">${esc(trades.dev)}</div><div class="v x b">${esc(trades.exec)}</div></div>
-      ${r.overfit
-        ? `<div class="check warn"><span class="ic">⚑</span><span>${esc(r.overfit_note)}</span></div>`
-        : `<div class="check"><span class="ic">✓</span><span>過度擬合檢查：策略開發期間年化報酬率 ${esc(ann.dev)}，策略執行期間 ${esc(ann.exec)}，未達警示門檻（開發期間高出逾 15 個百分點）。</span></div>`}</section>
+    <section class="card"><h3>績效</h3>
+      <div class="score"><div class="hd"></div><div class="hd v">策略</div><div class="hd v">買進並持有</div>
+        ${vs("報酬率", "總報酬率")}${vs("年化報酬率", "年化報酬率")}${vs("最大回撤", "最大回撤")}${vs("Sharpe 比率", "Sharpe 比率（無風險利率 0）")}${solo("交易次數", "交易次數")}${solo("勝率", "勝率")}</div></section>
     ${con && con.findings.length ? `<section class="card"><h3>發現與洞察</h3>${con.findings.map((f, i) => `
       <div class="fi"><div class="lab"><span class="n">${i + 1}</span>發現</div><p>${esc(f.finding)}</p><div class="ins"><b>洞察</b>${esc(f.insight)}</div></div>`).join("")}</section>` : ""}
-    <section class="card"><h3>盤勢表現<span class="mu" style="font-weight:400">股價漲跌幅／策略報酬率</span></h3>
-      <div class="reg">${r.regimes.map((g) => `<span><span class="rdot ${g.kind}"></span>${esc(g.label)}<small>${esc(g.start)} 至 ${esc(g.end)}</small></span>
-        <span class="vals"><span class="${tone(g.price_change)}">${esc(g.price_change)}</span> / <b class="${tone(g.strategy)}">${esc(g.strategy)}</b></span>`).join("")}</div></section>
+    <section class="card"><h3>盤勢表現<span class="mu" style="font-weight:400">同類盤勢合計</span></h3>
+      ${r.regime_summary.map((g) => `<div class="rg"><div class="rh"><span class="rdot ${g.kind}"></span><b>${esc(g.label)}</b><span class="mu">${esc(g.segments)} 段 · ${esc(g.bars)} 個交易日 · 持倉 ${esc(g.exposure)}</span></div>
+        <div class="rv"><span>股價 <b class="${tone(g.price_change)}">${esc(g.price_change)}</b></span><span>策略 <b class="${tone(g.strategy)}">${esc(g.strategy)}</b></span></div></div>`).join("")}
+      <p class="mu" style="margin-top:8px;font-size:11.5px">各段明細見下方「盤勢分段」。</p></section>
     <section class="card"><details class="more"><summary>完整績效指標與交易統計</summary>
-      ${table('<th></th><th class="n">開發</th><th class="n">執行</th><th class="n">持有（開發）</th><th class="n">持有（執行）</th>', M.map((m) => `<tr><th>${esc(m.label)}</th><td class="n ${tone(m.dev)}">${esc(m.dev)}</td><td class="n b ${tone(m.exec)}">${esc(m.exec)}</td><td class="n mu">${esc(m.bh_dev)}</td><td class="n mu">${esc(m.bh_exec)}</td></tr>`).join(""))}
-      ${table('<th></th><th class="n">開發</th><th class="n">執行</th>', T.map((m) => `<tr><th>${esc(m.label)}</th><td class="n ${tone(m.dev)}">${esc(m.dev)}</td><td class="n b ${tone(m.exec)}">${esc(m.exec)}</td></tr>`).join(""))}
+      ${table('<th></th><th class="n">策略</th><th class="n">買進並持有</th>', M.map((m) => `<tr><th>${esc(m.label)}</th><td class="n b ${tone(m.strategy)}">${esc(m.strategy)}</td><td class="n mu">${esc(m.bh)}</td></tr>`).join(""))}
+      ${table('<th></th><th class="n">策略</th>', T.map((m) => `<tr><th>${esc(m.label)}</th><td class="n b ${tone(m.value)}">${esc(m.value)}</td></tr>`).join(""))}
     </details></section>`;
 }
 

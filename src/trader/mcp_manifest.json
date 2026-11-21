@@ -3,7 +3,7 @@
     "name": "llm-agent-trader",
     "version": ""
   },
-  "instructions": "Taiwan stock backtesting harness. You discuss strategies with the user, write them,\nand backtest them on a deterministic engine. The user may not be an engineer.\n\nAt the start of every conversation, before any other trader tool, call get_research_guide and\nfollow it exactly: it covers the research folder (ask before creating it), getting started,\nthe five research conditions to confirm before the first backtest, writing strategies with\nsave_strategy, the development and execution periods, number rules, formal written Chinese,\nand the verdict-plus-findings conclusion stored with finalize_study.",
+  "instructions": "Taiwan stock backtesting harness. You discuss strategies with the user, write them,\nand backtest them on a deterministic engine. The user may not be an engineer.\n\nAt the start of every conversation, before any other trader tool, call get_research_guide and\nfollow it exactly: it covers the research folder (ask before creating it), getting started,\nthe four research conditions to confirm before the first backtest, writing strategies with\nsave_strategy, the backtest period, number rules, formal written Chinese, and the\nverdict-plus-findings conclusion stored with finalize_study.",
   "tools": [
     {
       "description": "The research guide: workflow, rules and conclusion format. Call this first in every\n    conversation, before any other trader tool, and follow it.",
@@ -160,7 +160,7 @@
       }
     },
     {
-      "description": "Backtest a saved strategy on one symbol over a development and an execution period.\n    If you have not called get_research_guide in this conversation, call it first. Before the\n    first backtest of a study, confirm the five research conditions in the guide with the user.\n\n    Dates are YYYY-MM-DD, inclusive, with dev_start <= dev_end < exec_start <= exec_end.\n    hypothesis (required): one sentence stating what this run tests, in formal written\n    language. params overrides keys in the strategy's PARAMS. fee overrides the default\n    fee schedule (commission_rate, min_commission, sell_tax_rate, floor_to_unit).\n    ",
+      "description": "Backtest a saved strategy on one symbol over one period.\n    If you have not called get_research_guide in this conversation, call it first. Before the\n    first backtest of a study, confirm the four research conditions in the guide with the user.\n\n    Dates are YYYY-MM-DD, inclusive, start <= end. The 60 trading days before start are loaded\n    as indicator history automatically.\n    hypothesis (required): one sentence stating what this run tests, in formal written\n    language. params overrides keys in the strategy's PARAMS. fee overrides the default\n    fee schedule (commission_rate, min_commission, sell_tax_rate, floor_to_unit).\n    ",
       "inputSchema": {
         "properties": {
           "strategy": {
@@ -171,20 +171,12 @@
             "title": "Symbol",
             "type": "string"
           },
-          "dev_start": {
-            "title": "Dev Start",
+          "start": {
+            "title": "Start",
             "type": "string"
           },
-          "dev_end": {
-            "title": "Dev End",
-            "type": "string"
-          },
-          "exec_start": {
-            "title": "Exec Start",
-            "type": "string"
-          },
-          "exec_end": {
-            "title": "Exec End",
+          "end": {
+            "title": "End",
             "type": "string"
           },
           "hypothesis": {
@@ -226,10 +218,8 @@
         "required": [
           "strategy",
           "symbol",
-          "dev_start",
-          "dev_end",
-          "exec_start",
-          "exec_end",
+          "start",
+          "end",
           "hypothesis"
         ],
         "type": "object",
@@ -251,7 +241,7 @@
       }
     },
     {
-      "description": "Full detail of one backtest: both periods' metrics, deepest drawdowns, market regimes,\n    fills, round trips, data fingerprint and source snapshot.",
+      "description": "Full detail of one backtest: metrics against buy-and-hold, deepest drawdowns, market regimes,\n    fills, round trips, data fingerprint and source snapshot.",
       "inputSchema": {
         "properties": {
           "run_id": {
