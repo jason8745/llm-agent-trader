@@ -55,7 +55,8 @@ def test_mcp_tools_over_stdio(ws):
     assert HYP in listing
 
 
-def test_mcp_and_cli_render_identical_numbers(ws):
+def test_mcp_and_cli_render_identical_numbers(ws, monkeypatch):
+    monkeypatch.setenv("TRADER_VIEWER_PORT", "18965")
     _, (result,) = call_tools(
         [
             (

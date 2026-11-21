@@ -1,0 +1,2 @@
+14:19:28 dashboard up during session: {"workspace": "<scratch>/e2e-readme/my-research"} runs=1
+GET /runs/1 -> 200
