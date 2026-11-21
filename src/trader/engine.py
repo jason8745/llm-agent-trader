@@ -120,7 +120,7 @@ def _parse_target(value: object) -> float:
 
 
 def _affordable_shares(cash: float, price: float, fees: Fees) -> int:
-    n = math.floor(cash / (price * (1 + fees.commission_rate)))
+    n = math.floor(cash / price + _FLOOR_EPS)
     while n > 0 and n * price + fees.commission(n * price) > cash:
         n -= 1
     return max(n, 0)
@@ -155,7 +155,8 @@ def simulate(
         led.dividends.append(div_cash)
 
         if pending is not None:
-            target_shares = math.floor(pending * (cash + shares * o) / o) if pending > 0 else 0
+            equity_at_open = cash + shares * o
+            target_shares = math.floor(pending * equity_at_open / o + _FLOOR_EPS) if pending else 0
             if target_shares < shares:
                 qty = shares - target_shares
                 gross = qty * o

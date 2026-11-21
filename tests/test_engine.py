@@ -213,3 +213,17 @@ def test_deterministic():
 
     a, b = run(), run()
     assert a.equity == b.equity and a.fills == b.fills
+
+
+def test_buys_every_affordable_share():
+    # 100 shares at 1000 cost 100,000 + floor(142.5) = 100,142: exactly affordable.
+    bars = make_bars([1000] * 4, [1000] * 4)
+    led = simulate(bars, lambda _h, _p: 1.0, TW_STOCK_FEES, 100_142, initial_target=1.0)
+    assert led.fills[0].shares == 100 and led.cash[0] == 0
+
+
+def test_fractional_target_survives_float_noise():
+    # 0.29 * 100 / 1 is 28.999999999999996 in floating point; the target is 29 shares.
+    bars = make_bars([1] * 4, [1] * 4)
+    led = simulate(bars, lambda _h, _p: 0.29, NO_FEES, 100, initial_target=0.29)
+    assert led.fills[0].shares == 29
