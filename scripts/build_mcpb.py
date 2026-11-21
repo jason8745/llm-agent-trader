@@ -63,7 +63,9 @@ def manifest(version: str) -> dict:
                 "default": "${DOCUMENTS}/trader-research",
             }
         },
-        "tools": [{"name": t["name"], "description": t["description"].split("\n")[0]} for t in tools],
+        "tools": [
+            {"name": t["name"], "description": t["description"].split("\n")[0]} for t in tools
+        ],
         "compatibility": {"platforms": ["darwin", "win32"]},
     }
 

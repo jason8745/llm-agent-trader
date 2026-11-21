@@ -54,3 +54,28 @@ def test_sanitize_strips_local_paths():
     text = f"{ROOT}/src/x.py {home}/notes /private/tmp/claude-502/-a-b/c/scratchpad/e2e/y.py"
     out = run("sanitize_evidence.py", "-", stdin=text).stdout
     assert out == "<repo>/src/x.py ~/notes <scratch>/e2e/y.py"
+
+
+def test_desktop_extension_bundle(tmp_path, monkeypatch):
+    import importlib.util
+    import zipfile
+
+    spec = importlib.util.spec_from_file_location("build_mcpb", ROOT / "scripts" / "build_mcpb.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    monkeypatch.setattr(mod, "DIST", tmp_path)
+    with zipfile.ZipFile(mod.build()) as z:
+        names = set(z.namelist())
+        m = json.loads(z.read("manifest.json"))
+    assert {"manifest.json", "icon.png", "pyproject.toml", "uv.lock", "README.md"} <= names
+    assert {"src/trader/guide.md", "src/trader/workspace.py", "src/trader/mcp_launcher.py"} <= names
+    assert not any(n.startswith(("tests/", "docs/")) or "__pycache__" in n for n in names)
+    assert m["manifest_version"] == "0.4" and m["server"]["type"] == "uv"
+    assert "--managed-python" in m["server"]["mcp_config"]["args"]
+    assert m["server"]["mcp_config"]["env"]["TRADER_WORKSPACE"] == "${user_config.workspace}"
+    assert m["user_config"]["workspace"]["default"] == "${DOCUMENTS}/trader-research"
+    assert {t["name"] for t in m["tools"]} >= {
+        "get_research_guide",
+        "setup_workspace",
+        "save_strategy",
+    }
