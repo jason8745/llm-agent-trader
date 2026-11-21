@@ -189,7 +189,7 @@ IS 與 OOS 屬於同一次連續回測，部位會跨越切分點延續，並非
 建立 llm-agent-trader v2：一套供 Claude Code 等 agent 使用的台股回測 harness。agent 撰寫 Python 策略，由確定性的引擎與損益模組回測，結果呈現在唯讀檢視器上。目的是讓「與 agent 討論策略 → 撰寫 → 驗證」形成快速、可重現且數字可信的迴圈。
 
 ## Done means
-- 執行 `claude mcp add trader -- uvx llm-agent-trader mcp`（或安裝 plugin）後，在新的 Claude Code session 內不設定任何 LLM API key，即可完成：以 `search_stock("台積電")` 取得 `2330.TW`、撰寫策略、`run_backtest`、開啟檢視器連結。
+- 執行 `/plugin install llm-agent-trader --marketplace jason8745/llm-agent-trader`，或 `claude mcp add trader -- uvx --from git+https://github.com/jason8745/llm-agent-trader llm-agent-trader mcp`（套件未發佈至 PyPI）後，在新的 Claude Code session 內不設定任何 LLM API key，即可完成：以 `search_stock("台積電")` 取得 `2330.TW`、撰寫策略、`run_backtest`、開啟檢視器連結。
 - 相同的策略原始碼、參數、標的、區間與資料，重複回測得到逐位元相同的績效。每個 run 記錄資料指紋，資料源修訂導致無法重現時可以被偵測。
 - 策略在結構上無法取得第 t 日之後的資料，且部位於第 t+1 日開盤成交。測試以「偷看未來」的策略驗證其無法得利。
 - 策略發生無窮迴圈、例外或回傳非法值時，該次 run 會在 timeout 內失敗並回傳明確錯誤訊息，MCP server 持續可用。

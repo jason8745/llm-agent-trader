@@ -129,3 +129,13 @@ def test_rejects_foreign_host_headers(served):
         with pytest.raises(urllib.error.HTTPError) as e:
             urllib.request.urlopen(req, timeout=5)
         assert e.value.code == 403
+
+
+def test_vendored_chart_library_is_pinned():
+    import hashlib
+
+    js = (Path(viewer.__file__).parent / "lightweight-charts.js").read_bytes()
+    assert b"Lightweight Charts\xe2\x84\xa2 v5.2.1" in js[:200]
+    assert hashlib.sha256(js).hexdigest() == (
+        "e21cc5caa0226ef30bd8549c50b9ef926615f2a4ee6b4e486353477a55f598cf"
+    )

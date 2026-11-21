@@ -248,3 +248,22 @@ def test_overfit_flag_fires_when_out_of_sample_collapses():
     r = report(simulate(bars, lambda _h, _p: 1.0, NO_FEES, 1e6), buy_and_hold(bars, NO_FEES, 1e6))
     assert r.out_of_sample.ret == pytest.approx(0, abs=0.01) and r.in_sample.ret > 0.3
     assert r.overfit
+
+
+def test_peeking_strategy_cannot_profit():
+    """The usual look-ahead bug, shift(-1), yields NaN on the engine's truncated history."""
+    bars = random_bars(n=250, seed=4)
+
+    def peek(hist, _pos):
+        tomorrow = hist["close"].shift(-1).iloc[-1]
+        return 1.0 if tomorrow > hist["close"].iloc[-1] else 0.0
+
+    led = simulate(bars, peek, NO_FEES, 1e6)
+    assert led.fills == [] and led.equity[-1] == 1e6
+
+    closes = bars["close"].tolist()
+    with_future = 1.0
+    for t in range(len(closes) - 1):
+        if closes[t + 1] > closes[t]:
+            with_future *= closes[t + 1] / closes[t]
+    assert with_future > 2, "the same rule with real future data would have been very profitable"
