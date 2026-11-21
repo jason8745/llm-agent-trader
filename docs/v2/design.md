@@ -36,7 +36,7 @@ v1 的做法是由後端呼叫 LLM endpoint，在每個觸發事件上請模型�
 | Q8 | 策略與結果存放 | 策略存放於使用者 workspace 的 `strategies/*.py`；每次 run 存入 SQLite，含策略原始碼快照與 hash |
 | Q9 | 策略執行 | 每次回測開一個 subprocess，設 timeout；不另做安全沙箱 |
 | Q10 | MCP tools | `search_stock`、`get_ohlcv`、`run_backtest`、`get_run`、`list_runs`；指標以 Python 函式庫 `trader.ta` 提供 |
-| Q11 | 發佈 | Python 套件，以 `uvx` 執行；檢視器以靜態檔案打包，使用者不需安裝 Node |
+| Q11 | 發佈 | Python 套件，以 `uvx` 執行；檢視器為標準函式庫 HTTP server 加靜態頁面，lightweight-charts 5.2.1 隨套件發佈，使用者不需安裝 Node；MCP server 會自動啟動所屬 workspace 的檢視器 |
 | Q12 | 防止過擬合 | 預設依 70/30 切分樣本內（IS）與樣本外（OOS），一律附 buy & hold 基準；過擬合警示比較年化報酬率（實作時修訂，見 decisions.tsv） |
 | Q13 | Skill | 以 Claude Code plugin 發佈（skill + MCP 設定） |
 | Q14 | `hypothesis` | `run_backtest` 必填，說明本次驗證的假設 |

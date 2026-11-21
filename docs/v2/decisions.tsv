@@ -12,3 +12,8 @@ ts	phase	decision	why	evidence	result
 2026-11-21T04:02:15Z	data	快取只保存結束日早於台北今日的區間	包含今日的資料可能尚未收盤或被修訂，快取會造成無法察覺的錯誤	tests/test_data.py test_ranges_touching_today_are_not_cached	tests green
 2026-11-21T04:09:22Z	profit	過擬合警示改為比較年化報酬率（偏離原定 Q12 的總報酬率差）	真實 2330.TW 回測中，樣本外 +48.10% 勝過買進並持有仍被標記；IS 約 2 年、OOS 約 10 個月，總報酬率不可直接比較	docs/v2/evidence/pr5/mcp-real-session.log, tests/test_engine.py test_overfit_flag_*	需使用者知悉
 2026-11-21T04:09:22Z	mcp	mcp 套件為 2.3.0，使用 MCPServer（FastMCP 已改名）	安裝最新版時發現 API 變動，依實際套件介面撰寫	src/trader/mcp_server.py	stdio 測試通過
+2026-11-21T04:19:48Z	viewer	檢視器改用標準函式庫 HTTP server 與靜態頁面，不採用 FastAPI 與 Next.js	只有兩頁與四個 JSON 端點；省去 Node 建置與兩個 Python 依賴，符合依賴最少的前提	src/trader/viewer/__init__.py	tests green
+2026-11-21T04:19:48Z	viewer	MCP server 自動啟動所屬 workspace 的檢視器，port 被其他 workspace 佔用時改用下一個	agent 給出的連結必須能直接開啟，且不可顯示其他專案的回測	tests/test_viewer.py test_ensure_running_* / test_mcp_starts_viewer_for_its_links	tests green
+2026-11-21T04:19:48Z	viewer	前端禁止格式化數字（以測試檢查 toFixed、toLocaleString、Intl）	將單一 formatter 規則寫成可執行的檢查，而非僅靠文件約定	tests/test_viewer.py test_frontend_never_formats_numbers	tests green
+2026-11-21T04:19:48Z	viewer	lightweight-charts 固定為 5.2.1（5.3.0 發佈未滿兩週）	避免採用剛發佈的版本	src/trader/viewer/lightweight-charts.js sha256 e21cc5ca	vendored
+2026-11-21T04:21:32Z	security	檢視器只接受 Host 為 127.0.0.1:port 或 localhost:port 的請求	自動安全審查指出 DNS rebinding 可讀取策略原始碼與路徑；修正成本低	tests/test_viewer.py test_rejects_foreign_host_headers	403 on foreign hosts
