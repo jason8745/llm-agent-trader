@@ -5,6 +5,7 @@ import datetime as dt
 import hashlib
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -140,6 +141,8 @@ def run_backtest(
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                # keep the user's strategies folder free of __pycache__
+                env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"),
             )
         except subprocess.TimeoutExpired as e:
             raise RunError(f"策略未在 {timeout:g} 秒內完成。") from e

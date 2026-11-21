@@ -179,3 +179,8 @@ def test_list_runs_filters(ws):
     assert [r.strategy for r in store.list_runs(ws)] == ["ma_cross", "hold"]
     assert [r.strategy for r in store.list_runs(ws, strategy="hold")] == ["hold"]
     assert runner.run_backtest(ws, "ma_cross", SYMBOL, hypothesis=HYP, **BT).n == 2
+
+
+def test_backtest_leaves_no_pycache_in_strategies(ws):
+    runner.run_backtest(ws, "ma_cross", SYMBOL, *PERIODS, "以 5 日與 20 日均線交叉作為基準策略。")
+    assert not (ws / "strategies" / "__pycache__").exists()
