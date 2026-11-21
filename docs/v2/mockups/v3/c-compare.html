@@ -1,0 +1,53 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="base.css"><script src="../../../../src/trader/viewer/lightweight-charts.js"></script><script src="mock-data.js"></script><script src="common.js"></script><title>版本三 期間對照</title>
+<style>
+main{padding:18px 24px 60px;max-width:1440px;margin:0 auto}
+.crumb{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);margin-bottom:6px}.crumb b{color:var(--ink);font-size:20px}
+.crumb select{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font:inherit}
+.q{font-family:var(--serif);font-size:18px;line-height:1.45;margin:6px 0 16px}
+.strip{display:flex;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--line);position:relative}
+.seg{display:flex;flex-direction:column;justify-content:center;padding:0 8px;font-family:var(--mono);font-size:11px;border-right:1px solid rgba(15,17,21,.6);min-width:0;overflow:hidden;white-space:nowrap}
+.seg.up{background:rgba(239,68,68,.16)}.seg.down{background:rgba(34,197,94,.16)}.seg.range{background:rgba(148,163,184,.12)}
+.seg b{font-family:var(--sans);font-size:12px}.xline{position:absolute;top:-4px;bottom:-4px;border-left:2px dashed var(--accent)}
+.xlab{position:absolute;top:-20px;font-size:11px;color:var(--accent);transform:translateX(6px);font-family:var(--mono)}
+.striplab{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted);margin:4px 0 18px}
+.vs{display:grid;grid-template-columns:1fr 220px 1fr;gap:16px;align-items:stretch}
+.side{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}.side.x{border-color:rgba(240,180,41,.5)}
+.side h2{font-size:15px;display:flex;justify-content:space-between;align-items:baseline}.side h2 small{font-family:var(--mono);font-size:11px;color:var(--muted);font-weight:400}
+.big{display:flex;align-items:baseline;gap:14px;margin:10px 0 4px}.big .v{font-family:var(--mono);font-size:34px;font-weight:700}.big .bh{font-family:var(--mono);color:var(--muted);font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.grid div{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+.grid small{color:var(--muted);font-size:11px;display:block}.grid span{font-family:var(--mono);font-size:15px;font-weight:600}
+.mid{display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.mid h3{font-size:13px;margin-bottom:10px}.mid .gap{font-family:var(--mono);font-size:26px;font-weight:700;margin:6px 0}
+.meter{width:100%;height:10px;border-radius:5px;background:linear-gradient(90deg,#22c55e 0 50%,#f0b429 50% 75%,#ef4444 75%);position:relative;margin:10px 0 4px}
+.meter i{position:absolute;top:-4px;width:3px;height:18px;background:var(--ink);border-radius:2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px 18px;margin-top:16px}.card h3{font-size:14px;margin-bottom:10px}
+h4{font-size:13px;margin:16px 0 8px}
+</style></head><body>
+<div class="topbar"><b>▍AGENT TRADER</b><span>~/my-research</span><span class="sp"></span><span>紅漲綠跌</span></div>
+<main id="main"></main>
+<script>
+const st = M.study, r = M.run, c = r.chart, m = Object.fromEntries(r.metrics.map((x) => [x.label, x])), t = Object.fromEntries(r.trade_metrics.map((x) => [x.label, x]));
+const total = c.dates.length, idx = Object.fromEntries(c.dates.map((d, i) => [d, i]));
+const segs = r.regimes.map((g) => { const w = (idx[g.end] - idx[g.start]) / (total - 1) * 100; return `<div class="seg ${g.kind}" style="width:${w}%" title="${g.label} ${g.start} 至 ${g.end}"><b>${w > 6 ? g.label : ""}</b>${w > 9 ? `股價 ${g.price_change}<br>策略 ${g.strategy}` : ""}</div>`; }).join("");
+const xpos = idx[c.exec_dates[0]] / (total - 1) * 100;
+const side = (p, title, cls) => `<section class="side ${cls}"><h2>${title}<small>${p === "dev" ? st.dev : st.exec}</small></h2>
+  <div class="big"><span class="v ${tone(m["總報酬率"][p])}">${m["總報酬率"][p]}</span><span class="bh">買進並持有 ${m["總報酬率"]["bh_" + p]}</span></div>
+  <div class="grid"><div><small>年化報酬率</small><span class="${tone(m["年化報酬率"][p])}">${m["年化報酬率"][p]}</span></div><div><small>最大回撤</small><span class="down">${m["最大回撤"][p]}</span></div><div><small>Sharpe 比率</small><span>${m["Sharpe 比率（無風險利率 0）"][p]}</span></div>
+  <div><small>交易次數</small><span>${t["交易次數"][p]}</span></div><div><small>勝率</small><span>${t["勝率"][p]}</span></div><div><small>持倉時間比例</small><span>${t["持倉時間比例"][p]}</span></div></div>
+  <div class="chart" id="pnl-${p}" style="height:170px"></div></section>`;
+document.getElementById("main").innerHTML = `
+<div class="crumb"><select><option>2330.TW 台積電</option><option>0050.TW 元大台灣50</option></select>›<select><option>ma_trend · 已定稿</option><option>rsi_reversal · 研究中</option></select>›<select><option>第 1 次迭代（定稿）</option><option>第 2 次迭代</option><option>第 3 次迭代</option></select></div>
+<p class="q">${esc(st.question)}</p>
+<div style="position:relative"><div class="xlab" style="left:${xpos}%">策略執行期間 →</div></div>
+<div class="strip">${segs}<div class="xline" style="left:${xpos}%"></div></div>
+<div class="striplab"><span>${c.dates[0]}</span><span>盤勢分段：紅為上漲段、灰為盤整段、綠為下跌段</span><span>${c.dates.at(-1)}</span></div>
+<div class="vs">${side("dev", "策略開發期間", "")}
+ <section class="mid"><h3>過度擬合檢查</h3><small class="mu">年化報酬率差距<br>（開發 − 執行）</small><div class="gap">${m["年化報酬率"].dev} / ${m["年化報酬率"].exec}</div>
+  <div class="meter"><i style="left:22%"></i></div><small class="mu">門檻：開發期間高出逾 15 個百分點時顯示 ⚑</small><p style="margin-top:10px;font-size:13px">未達警示門檻</p></section>
+ ${side("exec", "策略執行期間", "x")}</div>
+<section class="card concl"><h3>結論分析</h3>${markdown(st.conclusion)}</section>
+<section class="card"><h3>K 線與成交量</h3><div class="legend">${legendRegimes}</div><div class="chart" id="c1" style="height:380px"></div>
+ <h4>盤勢分段</h4>${regimesHTML(r)}</section>
+<section class="card"><h3>迭代比較</h3>${iterHTML(st)}</section>`;
+drawPrice(c1, c); drawPnl(document.getElementById("pnl-dev"), c, ["dev"]); drawPnl(document.getElementById("pnl-exec"), c, ["exec"]);
+</script></body></html>

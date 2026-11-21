@@ -6,7 +6,7 @@ A Taiwan stock backtesting harness for coding agents. You discuss a strategy wit
 
 Claude Code is the brain. This project is the hands: Taiwan market data, MCP tools, the backtest engine, the profit module, and a read-only dashboard. No LLM runs inside the backtest loop, and you do not need an LLM API key.
 
-![dashboard](docs/v2/evidence/pr6/detail-timeline.png)
+![dashboard](docs/v2/evidence/pr20/dashboard-desktop.png)
 
 ## How it works
 
@@ -107,14 +107,21 @@ For example:
 
 > 我想研究台積電的趨勢追蹤策略。請使用 2023-01-01 至 2025-12-31 的資料，設計一個均線類策略並回測，至少迭代兩次，最後告訴我結論。
 
+Before the first backtest, Claude confirms five things with you as numbered questions, each with a recommended answer. Reply 「yes」 to accept all of them:
+
+1. The symbol, with its Chinese name (`2330.TW 台積電`).
+2. The strategy logic and its starting parameters.
+3. The development period (策略開發期間), used to design and tune the strategy.
+4. The execution period (策略執行期間), a later period that simulates running the finished strategy. It starts flat with fresh cash and is never used for tuning. By default it is the last 12 months.
+5. Starting cash and fees.
+
 Claude asks for permission before it writes a file or calls a `trader` tool. Approve these requests. Claude then:
 
-1. Looks up the symbol (`search_stock("台積電")` returns `2330.TW`).
-2. Writes `strategies/<name>.py`.
-3. Confirms the symbol, strategy, both periods, cash and fees with you, then calls `run_backtest` with a stated hypothesis for each iteration and tunes on the development period only.
-4. Picks the final backtest, stores a conclusion with `finalize_study` (every number in it must appear in the tool output), and reports it with a dashboard link.
+1. Writes `strategies/<name>.py`.
+2. Calls `run_backtest` with a stated hypothesis for each iteration and tunes on the development period only. Both periods are always reported next to buy-and-hold, so a strategy that only worked on the data it was tuned on shows up immediately.
+3. Picks the final backtest and stores the conclusion with `finalize_study`: one verdict sentence plus 3 to 6 findings, each paired with an insight. Every number in the conclusion must appear in the tool output, or the tool refuses to store it.
 
-A full real session is in [docs/v2/evidence/pr7/claude-session.md](docs/v2/evidence/pr7/claude-session.md).
+A full real session, from the confirmation questions to the stored conclusion, is in [docs/v2/evidence/pr20/claude-session-turn1.md](docs/v2/evidence/pr20/claude-session-turn1.md) and [claude-session-turn2.md](docs/v2/evidence/pr20/claude-session-turn2.md).
 
 ### 4. Open the dashboard
 
@@ -122,7 +129,13 @@ Ask Claude 「打開 dashboard」 at any time, and it opens the dashboard in you
 
 Keep the dashboard open next to Claude Code. Each new backtest appears within a few seconds without a reload, and the page switches to it. If you open an older backtest, the page stays on it and only the list updates.
 
-The dashboard lists every study in this folder by stock. A study is one symbol, one strategy file and both periods; its page shows every iteration and the stored conclusion. Each backtest shows the hypothesis, the metrics of both periods next to buy-and-hold, the market regimes, a candlestick chart with buy and sell markers, profit and drawdown curves, the fills, the closed trades, and the strategy source.
+The dashboard is chart first:
+
+- **Left.** Your studies, grouped by stock. A study is one symbol, one strategy file and both periods, with every iteration listed under it.
+- **Center.** The iteration switcher, the hypothesis and four headline numbers, then three synchronized charts: candlesticks with volume, buy and sell markers and the market regimes; the cumulative return of the strategy against buy-and-hold; and the drawdown. Hover any chart to read that day's values. Fills, closed trades, the deepest drawdowns, the regime table and the strategy source are in the drawer below.
+- **Right.** The verdict, both periods side by side with the overfitting check, the findings and insights, and how the strategy did in each market regime.
+
+The execution period restarts from fresh cash, so the cumulative return chart continues the execution curve from the end of the development curve. Inside the execution period, the rise or fall of the curve equals the execution return exactly.
 
 The dashboard stops when Claude Code exits. Next time, start Claude Code in the same folder and ask it to open the dashboard again. Without Claude Code, run this in the project folder:
 
