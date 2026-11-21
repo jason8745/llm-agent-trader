@@ -1,0 +1,15 @@
+Simulated Claude Desktop launch of the .mcpb (server.type uv): clean HOME, PATH=/usr/bin:/bin (no uv, no Python), empty UV cache and Python install dir.
+uv used: uv 0.11.24 (5e04460c0 2026-06-23 aarch64-apple-darwin) by absolute path (Claude Desktop downloads uv 0.9.7; downloading that binary was blocked by a local permission rule).
+
+launch: uv run --no-project --managed-python --python 3.12 <sim>/ext/src/trader/mcp_launcher.py | cwd = <sim>/ext | PATH = /usr/bin:/bin
+handshake + tools/list: 1.9s, 10 tools
+get_research_guide: 0.0s -> # 台股策略研究指南
+save_strategy: 39.3s -> 研究資料夾尚未建立：<sim>/home/Documents/trader-research...
+folder not created before consent: ok
+setup_workspace: 0.0s -> 已建立研究資料夾：<sim>/home/Documents/trader-research...
+save_strategy: 0.0s -> 已儲存策略 ma_trend：<sim>/home/Documents/trader-research...
+search_stock: 0.0s -> | 代號 | 名稱 | 市場 | 類別 |
+run_backtest: 2.7s -> 回測 #1 · 研究 a95768d54844 第 1 次迭代 · ma_trend · 2330.TW 台積電
+open_dashboard: 0.0s -> 檢視器：http://127.0.0.1:18900/
+dashboard link 18900/runs/1 -> 200
+total 44.0s

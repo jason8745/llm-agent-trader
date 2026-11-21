@@ -1,5 +1,3 @@
-import sqlite3
-
 from conftest import DEV_END, DEV_START, EXEC_END, PERIODS, SYMBOL
 
 from trader import fmt, runner, store
@@ -9,20 +7,6 @@ HYP = "以 5 日與 20 日均線交叉作為基準策略。"
 
 def bt(ws, periods=PERIODS, **kw):
     return runner.run_backtest(ws, "ma_cross", SYMBOL, *periods, HYP, **kw)
-
-
-def test_legacy_runs_are_counted_not_shown(ws):
-    assert store.legacy_count(ws) == 0
-    path = store.db_path(ws)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(path)
-    con.execute("CREATE TABLE runs (id INTEGER PRIMARY KEY, payload TEXT)")
-    con.executemany("INSERT INTO runs (payload) VALUES (?)", [("{}",), ("{}",)])
-    con.commit()
-    con.close()
-    assert store.legacy_count(ws) == 2
-    assert store.list_runs(ws) == [] and store.list_studies(ws) == {}
-    assert bt(ws).id == 1
 
 
 def test_study_grouping_and_iteration_numbers(ws):

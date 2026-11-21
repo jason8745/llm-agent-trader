@@ -1,0 +1,55 @@
+$ check_transcript.py turn1.jsonl
+transcript checks passed
+assistant messages: 1, tool results: 3
+
+$ check_transcript.py turn2.jsonl
+number not found in any tool result: 2023
+number not found in any tool result: -01
+number not found in any tool result: -01
+number not found in any tool result: 2025
+number not found in any tool result: -12
+number not found in any tool result: -31
+number not found in any tool result: 0050
+number not found in any tool result: 2020
+number not found in any tool result: -01
+number not found in any tool result: -01
+number not found in any tool result: 2025
+number not found in any tool result: -12
+number not found in any tool result: -31
+number not found in any tool result: 2022
+number not found in any tool result: -01
+number not found in any tool result: -01
+number not found in any tool result: 2025
+number not found in any tool result: -12
+number not found in any tool result: -31
+assistant messages: 2, tool results: 4
+
+$ check_transcript.py turn3.jsonl
+number not found in any tool result: 2330
+number not found in any tool result: 20
+number not found in any tool result: 60
+number not found in any tool result: 20
+number not found in any tool result: 60
+number not found in any tool result: 2023
+number not found in any tool result: -01
+number not found in any tool result: -01
+number not found in any tool result: 2024
+number not found in any tool result: -12
+number not found in any tool result: -31
+number not found in any tool result: 2025
+number not found in any tool result: -01
+number not found in any tool result: -01
+number not found in any tool result: 2025
+number not found in any tool result: -12
+number not found in any tool result: -31
+number not found in any tool result: 12
+number not found in any tool result: 1,000,000
+number not found in any tool result: 0.1425%
+number not found in any tool result: 20
+number not found in any tool result: 0.3%
+assistant messages: 1, tool results: 0
+
+$ check_transcript.py turn4.jsonl
+transcript checks passed
+assistant messages: 1, tool results: 6
+

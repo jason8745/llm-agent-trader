@@ -8,7 +8,7 @@ import sys
 from conftest import BT, PERIODS, SYMBOL
 from mcp import Client, StdioServerParameters
 
-from trader import fmt, mcp_server, runner, store
+from trader import fmt, mcp_server, runner, store, workspace
 
 HYP = "以 5 日與 20 日均線交叉作為基準策略。"
 BACKTEST = {"strategy": "ma_cross", "symbol": SYMBOL, "hypothesis": HYP, **BT}
@@ -43,11 +43,14 @@ def test_mcp_tools_over_stdio(ws):
     assert tools == [
         "finalize_study",
         "get_ohlcv",
+        "get_research_guide",
         "get_run",
         "list_runs",
         "open_dashboard",
         "run_backtest",
+        "save_strategy",
         "search_stock",
+        "setup_workspace",
     ]
     assert "2330.TW" in found and "台積電" in found
     run_id = int(re.search(r"回測 #(\d+)", result).group(1))
@@ -156,3 +159,49 @@ def test_finalize_requires_paired_findings_and_insights(ws):
     missing = [pair, {"finding": "只有發現。", "insight": ""}, pair]
     assert "第 2 組須同時包含" in mcp_server.finalize(ws, a.id, "總結。", missing, 8765)
     assert store.get_study(ws, a.study_key).conclusion is None
+
+
+def test_research_folder_is_created_only_by_setup_workspace(tmp_path, monkeypatch):
+    target = tmp_path / "Documents" / "trader-research"
+    monkeypatch.setenv("TRADER_WORKSPACE", str(target))
+    guide = mcp_server.get_research_guide()
+    assert "## 開始使用" in guide and str(target) in guide and "尚未建立" in guide
+    code = 'PARAMS = {"fast": 5}\n\n\ndef on_bar(hist, pos, p):\n    return 0.0\n'
+    for out in [
+        mcp_server.save_strategy("ma_cross", code),
+        mcp_server.list_runs(),
+        mcp_server.get_run(1),
+        mcp_server.open_dashboard(),
+        mcp_server.finalize_study(1, "總結。", []),
+    ]:
+        assert out.startswith("研究資料夾尚未建立") and "setup_workspace" in out
+    assert not target.exists(), "no tool may create the folder before setup_workspace"
+    assert mcp_server.setup_workspace().startswith("已建立研究資料夾")
+    assert (target / "strategies").is_dir() and "已建立" in mcp_server.get_research_guide()
+    assert mcp_server.setup_workspace().startswith("研究資料夾已存在")
+
+
+def test_default_research_folder_is_in_documents(monkeypatch, tmp_path):
+    monkeypatch.delenv("TRADER_WORKSPACE", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert workspace.path() == tmp_path / "Documents" / "trader-research"
+
+
+def test_save_strategy_validates_then_writes(ws):
+    good = 'PARAMS = {"fast": 5}\n\n\ndef on_bar(hist, pos, p):\n    return 0.0'
+    assert mcp_server.save_strategy("Bad-Name", good).startswith("策略名稱須以小寫英文字母開頭")
+    bad = {
+        "def on_bar(hist, pos, p):\n    return (": "語法錯誤",
+        'PARAMS = {"fast": 5}\n': "缺少 on_bar",
+        "PARAMS = {}\ndef on_bar(hist, pos):\n    return 0.0\n": "三個參數",
+        "def on_bar(hist, pos, p):\n    return 0.0\n": "缺少 PARAMS",
+    }
+    for code, why in bad.items():
+        out = mcp_server.save_strategy("trial", code)
+        assert out.startswith("策略未儲存") and why in out, out
+    assert not (ws / "strategies" / "trial.py").exists()
+    assert mcp_server.save_strategy("trial", good).startswith("已儲存策略 trial")
+    assert (ws / "strategies" / "trial.py").read_text(encoding="utf-8") == good + "\n"
+    assert mcp_server.save_strategy("trial", good).startswith("已更新策略 trial")
+    run = runner.run_backtest(ws, "trial", SYMBOL, *PERIODS, HYP)
+    assert run.strategy == "trial"

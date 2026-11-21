@@ -1,40 +1,96 @@
 """MCP tools over stdio. Every number in a tool result comes from trader.profit via trader.fmt."""
 
+import ast
 import datetime as dt
 import json
 import os
+import re
 import webbrowser
 from typing import TypedDict
 
 from mcp.server import MCPServer
 
-from trader import data, fmt, runner, store, viewer
+from trader import data, fmt, runner, store, viewer, workspace
 
 VIEWER_PORT = int(os.environ.get("TRADER_VIEWER_PORT", "8765"))
 
-INSTRUCTIONS = """Taiwan stock backtesting harness. You write strategies; the engine runs them.
+INSTRUCTIONS = """Taiwan stock backtesting harness. You discuss strategies with the user, write them,
+and backtest them on a deterministic engine. The user may not be an engineer.
 
-A strategy is a Python file (usually strategies/<name>.py) defining
-    PARAMS = {...}
-    def on_bar(hist, pos, p) -> float
-hist is a DataFrame of bars up to and including today (open, high, low, close, volume,
-dividend); pos is the current position as a fraction of equity; p is PARAMS merged with
-overrides. Return the target position, 0.0 to 1.0. It fills at the next day's open and only
-changes when the returned target changes. Indicators: `from trader import ta`
-(sma, ema, rsi, macd, bbands, atr; they compose).
-
-Every backtest has two explicit periods, each compared with buy-and-hold:
-策略開發期間 (development: design and tune the strategy here) and 策略執行期間 (execution:
-a simulated live run that starts flat with the initial cash; indicators may use earlier
-bars). Tune on the development period only. A study is one symbol, one strategy file and
-both periods; finalize it with finalize_study. Quote numbers exactly as the tools return
-them."""
+At the start of every conversation, before any other trader tool, call get_research_guide and
+follow it exactly: it covers the research folder (ask before creating it), getting started,
+the five research conditions to confirm before the first backtest, writing strategies with
+save_strategy, the development and execution periods, number rules, formal written Chinese,
+and the verdict-plus-findings conclusion stored with finalize_study."""
 
 server = MCPServer("llm-agent-trader", instructions=INSTRUCTIONS)
 
 
 def _ws():
-    return runner.workspace()
+    return workspace.path()
+
+
+STRATEGY_NAME = re.compile(r"[a-z][a-z0-9_]{0,40}")
+
+
+def _needs_workspace() -> str | None:
+    return workspace.missing()
+
+
+def check_strategy(code: str) -> str | None:
+    """Why the code is not a valid strategy, or None. Static checks only; nothing is executed."""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        return f"第 {e.lineno} 行語法錯誤：{e.msg}"
+    funcs = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
+    if "on_bar" not in funcs:
+        return "缺少 on_bar(hist, pos, p) 函式。"
+    if len(funcs["on_bar"].args.args) != 3:
+        return "on_bar 必須接受三個參數：hist、pos、p。"
+    params = [
+        n
+        for n in tree.body
+        if isinstance(n, ast.Assign) and any(getattr(t, "id", None) == "PARAMS" for t in n.targets)
+    ]
+    if not params or not isinstance(params[-1].value, ast.Dict):
+        return '缺少 PARAMS 字典，例如 PARAMS = {"fast": 20, "slow": 60}。'
+    return None
+
+
+@server.tool()
+def get_research_guide() -> str:
+    """The research guide: workflow, rules and conclusion format. Call this first in every
+    conversation, before any other trader tool, and follow it."""
+    return workspace.guide()
+
+
+@server.tool()
+def setup_workspace() -> str:
+    """Create the research folder that holds strategies and backtest records.
+
+    Only call this after the user has agreed to the folder being created at the path shown
+    by get_research_guide."""
+    return workspace.setup()
+
+
+@server.tool()
+def save_strategy(name: str, code: str) -> str:
+    """Save a strategy as strategies/<name>.py in the research folder; use this instead of any
+    other file tool. name: lowercase letters, digits and underscores, e.g. ma_trend. The code
+    must define PARAMS (a dict) and on_bar(hist, pos, p). Saving the same name overwrites it.
+    If you have not called get_research_guide in this conversation, call it first.
+    """
+    if msg := _needs_workspace():
+        return msg
+    if not STRATEGY_NAME.fullmatch(name or ""):
+        return "策略名稱須以小寫英文字母開頭，只能包含小寫英文字母、數字與底線，例如 ma_trend。"
+    if problem := check_strategy(code):
+        return f"策略未儲存：{problem}"
+    path = _ws() / "strategies" / f"{name}.py"
+    existed = path.exists()
+    path.write_text(code if code.endswith("\n") else code + "\n", encoding="utf-8")
+    return f"{'已更新' if existed else '已儲存'}策略 {name}：{path}"
 
 
 def _port() -> int:
@@ -47,7 +103,8 @@ def _port() -> int:
 
 @server.tool()
 def search_stock(query: str) -> str:
-    """Find Taiwan stocks and ETFs by code or Chinese name, e.g. "台積電" or "2330"."""
+    """Find Taiwan stocks and ETFs by code or Chinese name, e.g. "台積電" or "2330".
+    If you have not called get_research_guide in this conversation, call it first."""
     hits = data.search_stock(query)
     if not hits:
         return f"查無符合「{query}」的上市櫃股票或 ETF。"
@@ -97,13 +154,17 @@ def run_backtest(
     cash: float = runner.DEFAULT_CASH,
     fee: dict | None = None,
 ) -> str:
-    """Backtest a strategy file on one symbol over a development and an execution period.
+    """Backtest a saved strategy on one symbol over a development and an execution period.
+    If you have not called get_research_guide in this conversation, call it first. Before the
+    first backtest of a study, confirm the five research conditions in the guide with the user.
 
     Dates are YYYY-MM-DD, inclusive, with dev_start <= dev_end < exec_start <= exec_end.
     hypothesis (required): one sentence stating what this run tests, in formal written
     language. params overrides keys in the strategy's PARAMS. fee overrides the default
     fee schedule (commission_rate, min_commission, sell_tax_rate, floor_to_unit).
     """
+    if msg := _needs_workspace():
+        return msg
     try:
         run = runner.run_backtest(
             _ws(),
@@ -127,6 +188,8 @@ def run_backtest(
 def get_run(run_id: int) -> str:
     """Full detail of one backtest: both periods' metrics, deepest drawdowns, market regimes,
     fills, round trips, data fingerprint and source snapshot."""
+    if msg := _needs_workspace():
+        return msg
     run = store.get(_ws(), run_id)
     if run is None:
         return f"查無回測 #{run_id}。"
@@ -137,6 +200,8 @@ def get_run(run_id: int) -> str:
 @server.tool()
 def list_runs(strategy: str | None = None, symbol: str | None = None) -> str:
     """All backtests in this workspace grouped by study, oldest first, optionally filtered."""
+    if msg := _needs_workspace():
+        return msg
     ws = _ws()
     return fmt.runs_markdown(store.list_runs(ws, strategy, symbol), store.list_studies(ws))
 
@@ -193,6 +258,8 @@ def finalize_study(run_id: int, verdict: str, findings: list[Finding]) -> str:
     otherwise nothing is stored and the missing numbers are listed. Finalizing again
     overwrites the previous choice and conclusion.
     """
+    if msg := _needs_workspace():
+        return msg
     return finalize(_ws(), run_id, verdict, findings, _port())
 
 
@@ -203,6 +270,8 @@ def open_dashboard(run_id: int | None = None) -> str:
     The dashboard lists every study and backtest in the workspace and shows new backtests
     without a reload. Pass run_id to open one backtest.
     """
+    if msg := _needs_workspace():
+        return msg
     port = _port()
     url = fmt.viewer_url(run_id, port) if run_id else f"http://127.0.0.1:{port}/"
     if run_id and store.get(_ws(), run_id) is None:

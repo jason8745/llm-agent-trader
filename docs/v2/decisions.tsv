@@ -34,3 +34,7 @@ ts	phase	decision	why	evidence	result
 2026-11-21T08:13:18Z	conclusion	finalize_study 改為結構化：一句總結加 3 至 6 組發現與洞察，寫入前驗證每個數字；skill 禁止以文字表達推算數量	使用者指出結論只有敘述沒有 insight；以結構強制每則發現都有洞察	tests/test_mcp.py；docs/v2/evidence/pr20/claude-session-turn2.md	第一次送出即通過驗證
 2026-11-21T08:13:18Z	dashboard	採看盤桌版面並加入版本一的重點區；累積報酬率將執行期間接續於開發期間終點繪製；回撤合併為一條並淡化開發期間	使用者選版本二、要求更友善並指出損益與回撤的斷層體感不佳；串接後執行期間內的漲跌幅恰等於執行期間報酬率	docs/v2/mockups/v3/b2-desk.png；docs/v2/evidence/pr20	即時更新四種情況通過
 2026-11-21T08:13:18Z	version	版本號維持 2.x，本次為 2.3.0	使用者指示版本維持 2.x.x	pyproject.toml、plugin.json	2.3.0
+2026-11-21T08:45:35Z	desktop	以 .mcpb（server.type uv）支援 Claude Desktop；Claude Desktop 自行下載 uv（userData/uv-runtime，固定版本 0.9.7 並驗證 sha256）	使用者要求支援不會用終端機的人；以 Claude Desktop 程式內容確認其 uv 執行環境，而非僅依文件	scripts/build_mcpb.py；docs/v2/evidence/pr21/desktop-simulation.log、mcpb-validate.log	乾淨環境模擬可運作
+2026-11-21T08:45:35Z	workspace	研究資料夾只有一個：~/Documents/trader-research；只由 setup_workspace 在使用者同意後建立	使用者要求更簡化、由 skill 處理並徵求同意；非工程師在 Finder 看得到「文件」	tests/test_mcp.py、tests/test_cli.py	同意前不會建立
+2026-11-21T08:45:35Z	guide	研究規則集中於 src/trader/guide.md，由 get_research_guide 提供；新增 save_strategy；launcher 直接回應 guide 與 setup	Claude Desktop 不一定讀取 skill 或 server instructions，且沒有寫檔工具；首個工具呼叫不可等待依賴安裝	docs/v2/evidence/pr21/claude-code-turn1..4.md	四輪對話符合設計
+2026-11-21T08:45:35Z	readme	README 改為繁體中文，Claude Desktop 安裝在前	目標使用者為台灣非工程師；使用者將錄製 demo 影片	README.md	完成

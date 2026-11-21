@@ -377,7 +377,6 @@ async function route(push) {
 (async () => {
   const [info, t] = await Promise.all([getJSON("/api/info"), getJSON("/api/tree")]);
   $("ws").textContent = info ? info.workspace : "";
-  if (info && info.legacy_runs) $("legacy").textContent = `另有 ${info.legacy_runs} 筆舊版回測未顯示（舊版以 70/30 切分，數字無法比較）`;
   tree = t || [];
   signature = sig(tree);
   await route(false);

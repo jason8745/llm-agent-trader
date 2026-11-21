@@ -36,10 +36,6 @@ class RunError(Exception):
     pass
 
 
-def workspace() -> Path:
-    return Path(os.environ.get("TRADER_WORKSPACE") or os.getcwd()).resolve()
-
-
 def resolve_strategy(ws: Path, strategy: str) -> Path:
     p = Path(strategy)
     candidates = [p] if p.is_absolute() else [ws / p, ws / "strategies" / p]
@@ -145,6 +141,8 @@ def run_backtest(
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                # keep the user's strategies folder free of __pycache__
+                env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"),
             )
         except subprocess.TimeoutExpired as e:
             raise RunError(f"策略未在 {timeout:g} 秒內完成。") from e
