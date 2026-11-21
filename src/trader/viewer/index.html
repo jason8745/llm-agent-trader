@@ -9,12 +9,9 @@
 <script src="/static/lightweight-charts.js"></script>
 </head>
 <body>
-<header class="bar"><b>▍AGENT TRADER</b><span id="ws" class="muted"></span><span class="sp"></span><span class="muted">樣本內 70% / 樣本外 30% · 紅漲綠跌</span></header>
+<header class="bar"><b>▍AGENT TRADER</b><span id="ws" class="muted"></span><span class="sp"></span><span id="legacy" class="muted"></span><span class="muted">紅漲綠跌</span></header>
 <div class="split">
-  <nav class="list" aria-label="回測紀錄">
-    <div class="mode"><button data-mode="tl" aria-pressed="true">時間軸</button><button data-mode="rank" aria-pressed="false">排行</button></div>
-    <div id="lst"></div>
-  </nav>
+  <nav class="tree" id="tree" aria-label="依股票分組的研究"></nav>
   <main class="detail" id="d"></main>
 </div>
 <script src="/static/app.js"></script>
