@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "llm-agent-trader",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "Taiwan stock backtesting harness: discuss a strategy, let Claude write it, and backtest it on a deterministic engine with in-sample, out-of-sample, and buy-and-hold results.",
   "author": {
     "name": "jason8745",

@@ -1,0 +1,14 @@
+Clean simulation of Claude Desktop launching the 2.4.1 extension: no settings, HOME=<sim>/home, PATH=/usr/bin:/bin, empty uv cache and Python dir. uv 0.11.24 by absolute path.
+
+launch: uv run --no-project --managed-python --python 3.12 <sim>/ext/src/trader/mcp_launcher.py | cwd = <sim>/ext | PATH = /usr/bin:/bin
+handshake + tools/list: 2.4s, 10 tools
+get_research_guide: 0.0s -> # 台股策略研究指南
+save_strategy: 130.7s -> 研究資料夾尚未建立：<sim>/home/Documents/trader-research...
+folder not created before consent: ok
+setup_workspace: 0.0s -> 已建立研究資料夾：<sim>/home/Documents/trader-research...
+save_strategy: 0.0s -> 已儲存策略 ma_trend：<sim>/home/Documents/trader-research...
+search_stock: 0.0s -> | 代號 | 名稱 | 市場 | 類別 |
+run_backtest: 2.8s -> 回測 #1 · 研究 a95768d54844 第 1 次迭代 · ma_trend · 2330.TW 台積電
+open_dashboard: 0.0s -> 檢視器：http://127.0.0.1:18900/
+dashboard link 18900/runs/1 -> 200
+total 135.9s
